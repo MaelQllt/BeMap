@@ -219,65 +219,125 @@
 
 
     // ///////////////////////////////////////////////////////////////////////////////
-    // // ZOOM LOGIC (Pinch & Hold)
+    // // ZOOM & PAN LOGIC (Hold to Zoom + Drag to Pan)
     // ///////////////////////////////////////////////////////////////////////////////
     // #region ZOOM_LOGIC
+    let translateX = 0, translateY = 0;
+    let lastMouseX, lastMouseY;
+
     function startZoom(clientX, clientY) {
         if (isZooming) return;
         isZooming = true;
+        
         const rect = photoContainer.getBoundingClientRect();
+        
+        // Calcul de l'origine en %
         zoomOriginX = ((clientX - rect.left) / rect.width) * 100;
         zoomOriginY = ((clientY - rect.top) / rect.height) * 100;
+        
         mainPhoto.style.transformOrigin = `${zoomOriginX}% ${zoomOriginY}%`;
-        mainPhoto.style.transition = 'transform 0.2s ease-out';
+        
+        lastMouseX = clientX;
+        lastMouseY = clientY;
+        translateX = 0;
+        translateY = 0;
+        
         zoomScale = 2.5;
-        mainPhoto.style.transform = `scale(${zoomScale})`;
+        mainPhoto.style.transition = 'transform 0.25s ease-out';
+        updateTransform();
         photoContainer.classList.add('zoomed');
+    }
+
+    function handlePan(clientX, clientY) {
+        if (!isZooming || isPinching) return;
+
+        const dx = clientX - lastMouseX;
+        const dy = clientY - lastMouseY;
+        
+        // On ajuste la vitesse de déplacement selon le zoom
+        translateX += dx / zoomScale;
+        translateY += dy / zoomScale;
+
+        // --- CALCUL DES LIMITES (ANTI-BORD-GRIS) ---
+        // Le principe : plus l'origine est proche d'un bord, 
+        // moins on peut bouger dans cette direction.
+        
+        const ratio = (zoomScale - 1) / zoomScale;
+        const rect = photoContainer.getBoundingClientRect();
+
+        // Limites horizontales
+        const limitLeft = rect.width * ratio * (zoomOriginX / 100);
+        const limitRight = rect.width * ratio * (1 - zoomOriginX / 100);
+        
+        // Limites verticales
+        const limitTop = rect.height * ratio * (zoomOriginY / 100);
+        const limitBottom = rect.height * ratio * (1 - zoomOriginY / 100);
+
+        // Application des contraintes
+        translateX = Math.max(-limitRight, Math.min(limitLeft, translateX));
+        translateY = Math.max(-limitBottom, Math.min(limitTop, translateY));
+
+        lastMouseX = clientX;
+        lastMouseY = clientY;
+        
+        mainPhoto.style.transition = 'none';
+        updateTransform();
+    }
+
+    function updateTransform() {
+        mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
     }
 
     function endZoom() {
         if (!isZooming) return;
+        
+        justFinishedDrag = true; 
         isZooming = false;
+        
         mainPhoto.style.transition = 'transform 0.3s ease-out';
         zoomScale = 1;
-        mainPhoto.style.transform = 'scale(1)';
+        translateX = 0;
+        translateY = 0;
+        
+        updateTransform();
         photoContainer.classList.remove('zoomed');
-        setTimeout(() => { mainPhoto.style.transformOrigin = 'center center'; }, 300);
+
+        // On réinitialise l'origine au centre après l'animation de dézoom
+        setTimeout(() => {
+            mainPhoto.style.transformOrigin = 'center center';
+            justFinishedDrag = false;
+        }, 300);
     }
 
     function resetZoomState() {
         isZooming = false; isPinching = false; zoomScale = 1;
-        mainPhoto.style.transform = 'scale(1)';
-        mainPhoto.style.transformOrigin = 'center center';
+        translateX = 0; translateY = 0;
+        mainPhoto.style.transform = 'scale(1) translate(0,0)';
         photoContainer.classList.remove('zoomed');
     }
 
     function getDistance(touches) {
-        const dx = touches[0].clientX - touches[1].clientX;
-        const dy = touches[0].clientY - touches[1].clientY;
-        return Math.sqrt(dx * dx + dy * dy);
+        return Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
     }
 
+    // --- Events Souris ---
     photoContainer.addEventListener('mousedown', (e) => {
         if (e.target.closest('.mini-img-container')) return;
         startZoom(e.clientX, e.clientY);
-        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isZooming) handlePan(e.clientX, e.clientY);
     });
 
     document.addEventListener('mouseup', endZoom);
-    document.addEventListener('mouseleave', endZoom);
 
+    // --- Events Tactiles ---
     photoContainer.addEventListener('touchstart', (e) => {
         if (e.target.closest('.mini-img-container')) return;
         if (e.touches.length === 2) {
-            e.preventDefault(); isPinching = true;
+            isPinching = true;
             initialPinchDistance = getDistance(e.touches);
-            const center = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-            const rect = photoContainer.getBoundingClientRect();
-            zoomOriginX = ((center.x - rect.left) / rect.width) * 100;
-            zoomOriginY = ((center.y - rect.top) / rect.height) * 100;
-            mainPhoto.style.transformOrigin = `${zoomOriginX}% ${zoomOriginY}%`;
-            mainPhoto.style.transition = 'none';
         } else if (e.touches.length === 1) {
             startZoom(e.touches[0].clientX, e.touches[0].clientY);
         }
@@ -285,18 +345,24 @@
 
     photoContainer.addEventListener('touchmove', (e) => {
         if (e.target.closest('.mini-img-container')) return;
+        e.preventDefault(); // Empêche le scroll de la page pendant le zoom
+
         if (e.touches.length === 2 && isPinching) {
-            e.preventDefault();
             const currentDistance = getDistance(e.touches);
-            zoomScale = Math.max(1, Math.min(4, currentDistance / initialPinchDistance));
-            mainPhoto.style.transform = `scale(${zoomScale})`;
-            zoomScale > 1 ? photoContainer.classList.add('zoomed') : photoContainer.classList.remove('zoomed');
+            zoomScale = Math.max(1, Math.min(4, currentDistance / initialPinchDistance * 2));
+            updateTransform();
+        } else if (e.touches.length === 1 && isZooming) {
+            handlePan(e.touches[0].clientX, e.touches[0].clientY);
         }
     }, { passive: false });
 
-    photoContainer.addEventListener('touchend', (e) => { if (e.touches.length === 0) { isPinching = false; endZoom(); } });
+    photoContainer.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+            isPinching = false;
+            endZoom();
+        }
+    });
     // #endregion
-
 
     // ///////////////////////////////////////////////////////////////////////////////
     // // MAP & DATA LOGIC
@@ -397,7 +463,10 @@
     function prevPhoto() { if(currentIndex > 0) { currentIndex--; updateModalContent(); } }
     
     function closeModal() { 
-        if (isDragging || justFinishedDrag) return;
+        // Si on est en train de glisser la miniature OU si on vient de finir un zoom/pan
+        // on ne ferme pas le modal.
+        if (isDragging || justFinishedDrag || isZooming) return;
+        
         document.getElementById('bereal-modal').style.display = 'none'; 
         const mapEl = document.getElementById('map');
         mapEl.style.transform = 'scale(1)';
