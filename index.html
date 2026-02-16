@@ -46,9 +46,23 @@
         border-radius: 24px; overflow: hidden; background: #1c1c1e;
         box-shadow: 0 40px 100px rgba(0,0,0,0.9);
         border: 1px solid rgba(255,255,255,0.2);
+        cursor: zoom-in;
+        touch-action: none;
     }
-    
-    .main-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none;}
+
+    .bereal-container.zoomed {
+        cursor: zoom-out;
+    }
+
+    .main-img { 
+        width: 100%; height: 100%; object-fit: cover; pointer-events: none;
+        transform-origin: center center;
+        will-change: transform;
+    } 
+
+    .bereal-container.zoomed .main-img {
+        transform: scale(2); /* Zoom x2 */
+    }
 
     .bereal-logo-overlay {
         position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
@@ -222,6 +236,137 @@
         }
     });
 
+    // Fonction de zoom "maintenu" sur la photo principale
+const photoContainer = document.getElementById('photo-container');
+const mainPhoto = document.getElementById('main-photo');
+let isZooming = false;
+let zoomScale = 1;
+let zoomOriginX = 50;
+let zoomOriginY = 50;
+
+// Variables pour le pinch mobile
+let initialPinchDistance = 0;
+let isPinching = false;
+
+function startZoom(clientX, clientY) {
+    if (isZooming) return;
+    
+    isZooming = true;
+    
+    // Calcule le point d'origine du zoom en pourcentage
+    const rect = photoContainer.getBoundingClientRect();
+    zoomOriginX = ((clientX - rect.left) / rect.width) * 100;
+    zoomOriginY = ((clientY - rect.top) / rect.height) * 100;
+    
+    mainPhoto.style.transformOrigin = `${zoomOriginX}% ${zoomOriginY}%`;
+    mainPhoto.style.transition = 'transform 0.2s ease-out';
+    zoomScale = 2.5;
+    mainPhoto.style.transform = `scale(${zoomScale})`;
+    photoContainer.classList.add('zoomed');
+}
+
+function endZoom() {
+    if (!isZooming) return;
+    
+    isZooming = false;
+    mainPhoto.style.transition = 'transform 0.3s ease-out';
+    zoomScale = 1;
+    mainPhoto.style.transform = 'scale(1)';
+    // On garde le transformOrigin pour que le dézoom se fasse depuis le même point
+    photoContainer.classList.remove('zoomed');
+    
+    // Reset le transformOrigin APRÈS l'animation
+    setTimeout(() => {
+        mainPhoto.style.transformOrigin = 'center center';
+    }, 300);
+}
+
+// ZOOM AVEC CLICK MAINTENU (souris)
+photoContainer.addEventListener('mousedown', (e) => {
+    // Ignore si on clique sur la miniature
+    if (e.target.closest('.mini-img-container')) return;
+    
+    startZoom(e.clientX, e.clientY);
+    e.preventDefault();
+});
+
+document.addEventListener('mouseup', () => {
+    endZoom();
+});
+
+// Si la souris sort de la fenêtre, on relâche aussi
+document.addEventListener('mouseleave', () => {
+    endZoom();
+});
+
+// PINCH ZOOM sur mobile
+function getDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getCenter(touches) {
+    return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+    };
+}
+
+photoContainer.addEventListener('touchstart', (e) => {
+    // Ignore si on touche la miniature
+    if (e.target.closest('.mini-img-container')) return;
+    
+    if (e.touches.length === 2) {
+        e.preventDefault();
+        isPinching = true;
+        initialPinchDistance = getDistance(e.touches);
+        
+        // Calcule le point d'origine du pinch
+        const center = getCenter(e.touches);
+        const rect = photoContainer.getBoundingClientRect();
+        zoomOriginX = ((center.x - rect.left) / rect.width) * 100;
+        zoomOriginY = ((center.y - rect.top) / rect.height) * 100;
+        
+        mainPhoto.style.transformOrigin = `${zoomOriginX}% ${zoomOriginY}%`;
+        mainPhoto.style.transition = 'none';
+    } else if (e.touches.length === 1) {
+        // Long press pour zoomer sur mobile
+        const touch = e.touches[0];
+        startZoom(touch.clientX, touch.clientY);
+    }
+}, { passive: false });
+
+photoContainer.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.mini-img-container')) return;
+    
+    if (e.touches.length === 2 && isPinching) {
+        e.preventDefault();
+        
+        const currentDistance = getDistance(e.touches);
+        const scale = currentDistance / initialPinchDistance;
+        zoomScale = Math.max(1, Math.min(4, scale));
+        
+        mainPhoto.style.transform = `scale(${zoomScale})`;
+        
+        if (zoomScale > 1) {
+            photoContainer.classList.add('zoomed');
+        } else {
+            photoContainer.classList.remove('zoomed');
+        }
+    }
+}, { passive: false });
+
+photoContainer.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) {
+        if (isPinching) {
+            isPinching = false;
+            endZoom();
+        } else {
+            endZoom();
+        }
+    }
+});
 
     const map = new maplibregl.Map({
         container: 'map',
@@ -310,26 +455,47 @@
         mapEl.style.filter = 'blur(5px) saturate(160%) brightness(0.5)'; // Le vrai effet est ici
     }
 
-    function updateModalContent() {
-        const p = currentPhotos[currentIndex];
-        isFlipped = false;
-        document.getElementById('main-photo').src = p.back;
-        document.getElementById('mini-photo').src = p.front;
-        document.getElementById('modal-caption').innerText = p.caption || "allez le rugby";
-        document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
-        miniBox.style.left = '12px'; miniBox.style.top = '12px';
-        const multi = currentPhotos.length > 1;
-        document.getElementById('prevBtn').style.display = (multi && currentIndex > 0) ? 'flex' : 'none';
-        document.getElementById('nextBtn').style.display = (multi && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
-    }
+function updateModalContent() {
+    const p = currentPhotos[currentIndex];
+    isFlipped = false;
+    
+    // Reset le zoom
+    isZooming = false;
+    isPinching = false;
+    zoomScale = 1;
+    mainPhoto.style.transform = 'scale(1)';
+    mainPhoto.style.transformOrigin = 'center center';
+    photoContainer.classList.remove('zoomed');
+    
+    document.getElementById('main-photo').src = p.back;
+    document.getElementById('mini-photo').src = p.front;
+    document.getElementById('modal-caption').innerText = p.caption || "allez le rugby";
+    document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
+    
+    miniBox.style.transition = 'none';
+    miniBox.style.left = '14px';
+    miniBox.style.top = '14px';
+    
+    const multi = currentPhotos.length > 1;
+    document.getElementById('prevBtn').style.display = (multi && currentIndex > 0) ? 'flex' : 'none';
+    document.getElementById('nextBtn').style.display = (multi && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
+}
 
-    function flipImages() {
-        isFlipped = !isFlipped;
-        const p = currentPhotos[currentIndex];
-        document.getElementById('main-photo').src = isFlipped ? p.front : p.back;
-        document.getElementById('mini-photo').src = isFlipped ? p.back : p.front;
-    }
-
+function flipImages() {
+    isFlipped = !isFlipped;
+    const p = currentPhotos[currentIndex];
+    
+    // Reset le zoom
+    isZooming = false;
+    isPinching = false;
+    zoomScale = 1;
+    mainPhoto.style.transform = 'scale(1)';
+    mainPhoto.style.transformOrigin = 'center center';
+    photoContainer.classList.remove('zoomed');
+    
+    document.getElementById('main-photo').src = isFlipped ? p.front : p.back;
+    document.getElementById('mini-photo').src = isFlipped ? p.back : p.front;
+}
     function nextPhoto() { if(currentIndex < currentPhotos.length - 1) { currentIndex++; updateModalContent(); } }
     function prevPhoto() { if(currentIndex > 0) { currentIndex--; updateModalContent(); } }
     
