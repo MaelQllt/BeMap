@@ -98,6 +98,7 @@
             position: absolute;
             top: 0;
             left: 0;
+            transform: translateZ(0); /* Force l'accélération matérielle */
             -webkit-transform: translateZ(0); /* Force l'accélération matérielle */
             pointer-events: none;
         }
@@ -105,6 +106,7 @@
         /* On s'assure que les containers ont une position relative pour le position absolute des images */
         .bereal-container, .mini-img-container {
             position: relative;
+            mask-image: radial-gradient(white, black);
             -webkit-mask-image: -webkit-radial-gradient(white, black); /* Force Safari à respecter le border-radius */
         }
 
