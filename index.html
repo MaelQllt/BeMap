@@ -178,11 +178,30 @@
     let isZooming = false, zoomScale = 1, zoomOriginX = 50, zoomOriginY = 50;
     let initialPinchDistance = 0, isPinching = false;
 
+    // --- HAPTIC FEEDBACK ---
+    // #region HAPTIC_FEEDBACK
+    function vibrate(type) {
+        if (!navigator.vibrate) return;
+        
+        switch(type) {
+            case 'light':    // Petit clic sec (Flip, Navigation)
+                navigator.vibrate(10);
+                break;
+            case 'medium':   // Snap de la miniature
+                navigator.vibrate(20);
+                break;
+            case 'error':    // Si on arrive au bout de la liste
+                navigator.vibrate([10, 50, 10]);
+                break;
+        }
+    }
+
     // ///////////////////////////////////////////////////////////////////////////////
     // // DRAG & FLIP LOGIC (Miniature)
     // ///////////////////////////////////////////////////////////////////////////////
     // #region DRAG_FLIP
     function snapToCorner() {
+        vibrate('medium');
         miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
         const containerMidPoint = container.offsetWidth / 2;
         const miniBoxCenter = miniBox.offsetLeft + (miniBox.offsetWidth / 2);
@@ -231,6 +250,7 @@
 
     function flipImages() {
         isFlipped = !isFlipped;
+        vibrate('light'); 
         const p = currentPhotos[currentIndex];
         resetZoomState();
         document.getElementById('main-photo').src = isFlipped ? p.front : p.back;
@@ -480,8 +500,8 @@
         document.getElementById('nextBtn').style.display = (multi && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
     }
 
-    function nextPhoto() { if(currentIndex < currentPhotos.length - 1) { currentIndex++; updateModalContent(); } }
-    function prevPhoto() { if(currentIndex > 0) { currentIndex--; updateModalContent(); } }
+    function nextPhoto() { if(currentIndex < currentPhotos.length - 1) { currentIndex++; vibrate('light'); updateModalContent(); } }
+    function prevPhoto() { if(currentIndex > 0) { currentIndex--; vibrate('light'); updateModalContent(); } }
     
     function closeModal() { 
         // Si on est en train de glisser la miniature OU si on vient de finir un zoom/pan
