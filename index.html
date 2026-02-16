@@ -155,52 +155,74 @@
     // Miniatures Drag & Flip
     const miniBox = document.getElementById('mini-img-box');
     const container = document.getElementById('photo-container');
-    let isDragging = false, startX, startY, initialLeft, initialTop, hasMoved = false;
+    let isDragging = false;
+    let dragStartX, dragStartY;
+    let hasDragged = false;
+    let justFinishedDrag = false; // NOUVEAU FLAG
+
+    function snapToCorner() {
+        miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        
+        const containerMidPoint = container.offsetWidth / 2;
+        const miniBoxCenter = miniBox.offsetLeft + (miniBox.offsetWidth / 2);
+        
+        if (miniBoxCenter < containerMidPoint) {
+            miniBox.style.left = '14px';
+        } else {
+            miniBox.style.left = (container.offsetWidth - miniBox.offsetWidth - 14) + 'px';
+        }
+        miniBox.style.top = '14px';
+    }
 
     miniBox.addEventListener('mousedown', (e) => {
-        isDragging = true; hasMoved = false;
-        startX = e.clientX; startY = e.clientY;
-        initialLeft = miniBox.offsetLeft; initialTop = miniBox.offsetTop;
+        isDragging = true;
+        hasDragged = false;
+        dragStartX = e.clientX - miniBox.offsetLeft;
+        dragStartY = e.clientY - miniBox.offsetTop;
         miniBox.style.transition = 'none';
+        e.preventDefault();
+        e.stopPropagation();
     });
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
-        const dx = e.clientX - startX, dy = e.clientY - startY;
-        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
-        let newLeft = Math.max(10, Math.min(initialLeft + dx, container.offsetWidth - miniBox.offsetWidth - 10));
-        let newTop = Math.max(10, Math.min(initialTop + dy, container.offsetHeight - miniBox.offsetHeight - 10));
-        miniBox.style.left = newLeft + 'px'; miniBox.style.top = newTop + 'px';
+        
+        hasDragged = true;
+        
+        let newLeft = e.clientX - dragStartX;
+        let newTop = e.clientY - dragStartY;
+        
+        // Contraintes
+        newLeft = Math.max(10, Math.min(newLeft, container.offsetWidth - miniBox.offsetWidth - 10));
+        newTop = Math.max(10, Math.min(newTop, container.offsetHeight - miniBox.offsetHeight - 10));
+        
+        miniBox.style.left = newLeft + 'px';
+        miniBox.style.top = newTop + 'px';
     });
 
-    document.addEventListener('mouseup', () => {
-    if (!isDragging) return;
-    
-    // On verrouille la fermeture du modal pendant un court instant
-    setTimeout(() => { isDragging = false; }, 50);
-
-    if (!hasMoved) {
-        flipImages();
-    } else {
-        // ACTIVATION DE L'AIMANTATION (Snap effect)
-        miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+    document.addEventListener('mouseup', (e) => {
+        if (!isDragging) return;
         
-        // Calcul de la zone : si le centre de la vignette est à gauche ou à droite du milieu du container
-        const containerMidPoint = container.offsetWidth / 2;
-        const miniBoxMidPoint = miniBox.offsetLeft + (miniBox.offsetWidth / 2);
-
-        if (miniBoxMidPoint < containerMidPoint) {
-            // Aimante à gauche
-            miniBox.style.left = '12px';
+        isDragging = false;
+        
+        if (!hasDragged) {
+            // C'était un simple clic - on flip
+            flipImages();
+            e.stopPropagation();
         } else {
-            // Aimante à droite
-            miniBox.style.left = (container.offsetWidth - miniBox.offsetWidth - 12) + 'px';
+            // C'était un drag - on aimante
+            justFinishedDrag = true; // Active le flag
+            snapToCorner();
+            e.stopPropagation();
+            
+            // Reset le flag après l'animation complète
+            setTimeout(() => {
+                justFinishedDrag = false;
+            }, 500);
         }
-        
-        // On force toujours le retour en haut
-        miniBox.style.top = '12px';
-    }
-});
+    });
+
+
     const map = new maplibregl.Map({
         container: 'map',
         style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
@@ -312,8 +334,8 @@
     function prevPhoto() { if(currentIndex > 0) { currentIndex--; updateModalContent(); } }
     
     function closeModal() { 
-        // Si on est en train de draguer, on n'autorise pas la fermeture
-        if (isDragging) return;
+        // Si on est en train de draguer OU juste après, on bloque
+        if (isDragging || justFinishedDrag) return;
 
         document.getElementById('bereal-modal').style.display = 'none'; 
         const mapEl = document.getElementById('map');
