@@ -1,0 +1,66 @@
+[
+    {
+        "deviceId": "5EFCB080-17A8-4E49-A383-4F5F348E8728",
+        "clientVersion": "1.5.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "EA164E69-C03C-4696-A7CA-E6299A022A32",
+        "clientVersion": "1.6.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": null,
+        "clientVersion": null,
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "223D0CDB-CE50-42B9-B923-DB03A31BE5DB",
+        "clientVersion": "4.61.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "9A28D096-D8CB-462D-8E6B-E051FB0FD391",
+        "clientVersion": "4.4.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "223D0CDB-CE50-42B9-B923-DB03A31BE5DB",
+        "clientVersion": "4.61.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "EA164E69-C03C-4696-A7CA-E6299A022A32",
+        "clientVersion": "1.6.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    },
+    {
+        "deviceId": "9A28D096-D8CB-462D-8E6B-E051FB0FD391",
+        "clientVersion": "4.4.0",
+        "language": "fr",
+        "region": "europe-west",
+        "platform": "ios",
+        "timezone": "Europe/Paris"
+    }
+]

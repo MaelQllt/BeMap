@@ -1,0 +1,27 @@
+{
+    "username": "maaael.qllt",
+    "birthdate": {
+        "year": 1970,
+        "month": 1,
+        "day": 1
+    },
+    "fullname": "Maaaël",
+    "clientVersion": "4.61.0",
+    "device": "iPhone17,3 26.3",
+    "deviceId": "223D0CDB-CE50-42B9-B923-DB03A31BE5DB",
+    "phoneNumber": "+33637687922",
+    "profilePicture": {
+        "path": "/Photos/AF9TaX9kF2Ph70UyFt19wuMJvqr2/profile/X9u-3RqfGd2xcaU0NYSDe.webp",
+        "bucket": "storage.bere.al",
+        "height": "1000",
+        "width": "1000"
+    },
+    "biography": "🪂",
+    "location": "Émerainville",
+    "platform": 1,
+    "countryCode": "FR",
+    "language": "fr",
+    "timezone": "Europe/Paris",
+    "region": "europe-west",
+    "createdAt": "2022-10-24T14:06:31.092Z"
+}

@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8" />
+    <title>BeReal Map Premium</title>
+    <link rel="icon" href="data:,">
+    <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet">
+    <style>
+    body { 
+        margin: 0; padding: 0; 
+        font-family: 'Inter', sans-serif; 
+        background: #000; 
+        overflow: hidden;
+    }
+
+    #map { 
+        position: absolute; top: 0; bottom: 0; width: 100%; 
+        /* C'est ici que la magie opère : transition fluide */
+        transition: transform 0.7s cubic-bezier(0.19, 1, 0.22, 1), filter 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+        will-change: transform, filter;
+    }
+
+    /* MODAL TOTALEMENT TRANSPARENT POUR VOIR LA MAP */
+    #bereal-modal {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        display: none; justify-content: center; align-items: center;
+        z-index: 9999; 
+        background: transparent; /* Fond invisible pour ne pas cacher la map */
+    }
+
+    .modal-content { 
+        width: 90%; max-width: 420px; 
+        position: relative; display: flex; flex-direction: column; align-items: center; 
+        animation: modalScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+    }
+
+    @keyframes modalScale {
+        from { transform: scale(0.9); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+
+    .bereal-container {
+        position: relative; width: 100%; aspect-ratio: 3/4;
+        border-radius: 24px; overflow: hidden; background: #1c1c1e;
+        box-shadow: 0 40px 100px rgba(0,0,0,0.9);
+        border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .main-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none;}
+
+    .bereal-logo-overlay {
+        position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+        color: rgba(255, 255, 255, 0.5); font-weight: 600; font-size: 18px; 
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Ajoute du contraste si la map est claire derrière */
+        letter-spacing: -0.5px; pointer-events: none;
+    }
+
+    .mini-img-container {
+        position: absolute; top: 14px; left: 14px; width: 30%; aspect-ratio: 3/4; 
+        border-radius: 14px; z-index: 10; border: 2px solid #000; 
+        overflow: hidden; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .mini-img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+
+    /* Empêche la sélection de texte et le drag d'image natif du navigateur */
+    .bereal-container, .mini-img-container, .main-img, .mini-img {
+        user-select: none;
+        -webkit-user-drag: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Optionnel : Ajoute une petite animation de vibration (shake) */
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-2px); }
+        75% { transform: translateX(2px); }
+    }
+    .shake-effect {
+        animation: shake 0.1s ease-in-out 0s 2;
+    }
+
+    .bereal-footer { 
+        width: 100%; 
+        text-align: center; 
+        color: white; 
+        padding-top: 10px; 
+        pointer-events: none;
+        z-index: 10; /* Assure qu'il passe bien au dessus de tout */
+        opacity: 1 !important; 
+    }
+    .bereal-caption { 
+        font-size: 12px; 
+        color: #ffffff; 
+        font-weight: 400; /* On augmente l'épaisseur pour éviter l'effet grisâtre */
+        margin-bottom: 4px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5); /* Ajoute du contraste si la map est claire derrière */
+        -webkit-font-smoothing: antialiased; /* Force un rendu net sur Chrome/Safari */
+    }    
+
+    .bereal-metadata { 
+        font-size: 9px; 
+        color: rgba(255, 255, 255, 0.6); 
+        font-weight: 300; 
+        margin-bottom: 12px;
+    }
+    .bereal-username { font-size: 35px; font-weight: 700; text-transform: uppercase; line-height: 0.9; }
+
+    .nav-arrow {
+        position: absolute; top: 50%; transform: translateY(-110%);
+        background: rgba(255, 255, 255, 0.15); border: none; color: white; 
+        width: 50px; height: 50px; border-radius: 50%; cursor: pointer;
+        display: flex; align-items: center; justify-content: center; z-index: 100;
+        backdrop-filter: blur(15px);
+    }
+    .prev { left: -70px; } .next { right: -70px; }
+    .nav-arrow svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+
+    @media (max-width: 600px) {
+        .nav-arrow { display: none !important; }
+        .bereal-username { font-size: 38px; }
+    }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="bereal-modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <button id="prevBtn" class="nav-arrow prev" onclick="prevPhoto()"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+        <button id="nextBtn" class="nav-arrow next" onclick="nextPhoto()"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+
+        <div class="bereal-container" id="photo-container">
+            <img id="main-photo" src="" class="main-img">
+            <div id="mini-img-box" class="mini-img-container">
+                <img id="mini-photo" src="" class="mini-img">
+            </div>
+            <div class="bereal-logo-overlay">BeReal.</div>
+        </div>
+        
+        <div class="bereal-footer">
+            <div id="modal-caption" class="bereal-caption"></div>
+            <div id="modal-metadata" class="bereal-metadata"></div>
+            <div class="bereal-username">MAAAEL.QLLT</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const FOLDER_ID = "AF9TaX9kF2Ph70UyFt19wuMJvqr2-pGvnrPTVROrjNoqlXt1pl";
+    let currentPhotos = [], currentIndex = 0, isFlipped = false;
+
+    // Miniatures Drag & Flip
+    const miniBox = document.getElementById('mini-img-box');
+    const container = document.getElementById('photo-container');
+    let isDragging = false, startX, startY, initialLeft, initialTop, hasMoved = false;
+
+    miniBox.addEventListener('mousedown', (e) => {
+        isDragging = true; hasMoved = false;
+        startX = e.clientX; startY = e.clientY;
+        initialLeft = miniBox.offsetLeft; initialTop = miniBox.offsetTop;
+        miniBox.style.transition = 'none';
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const dx = e.clientX - startX, dy = e.clientY - startY;
+        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) hasMoved = true;
+        let newLeft = Math.max(10, Math.min(initialLeft + dx, container.offsetWidth - miniBox.offsetWidth - 10));
+        let newTop = Math.max(10, Math.min(initialTop + dy, container.offsetHeight - miniBox.offsetHeight - 10));
+        miniBox.style.left = newLeft + 'px'; miniBox.style.top = newTop + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    
+    // On verrouille la fermeture du modal pendant un court instant
+    setTimeout(() => { isDragging = false; }, 50);
+
+    if (!hasMoved) {
+        flipImages();
+    } else {
+        // ACTIVATION DE L'AIMANTATION (Snap effect)
+        miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+        
+        // Calcul de la zone : si le centre de la vignette est à gauche ou à droite du milieu du container
+        const containerMidPoint = container.offsetWidth / 2;
+        const miniBoxMidPoint = miniBox.offsetLeft + (miniBox.offsetWidth / 2);
+
+        if (miniBoxMidPoint < containerMidPoint) {
+            // Aimante à gauche
+            miniBox.style.left = '12px';
+        } else {
+            // Aimante à droite
+            miniBox.style.left = (container.offsetWidth - miniBox.offsetWidth - 12) + 'px';
+        }
+        
+        // On force toujours le retour en haut
+        miniBox.style.top = '12px';
+    }
+});
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+        center: [2.21, 46.22], zoom: 5.5, maxZoom: 15
+    });
+
+    async function init() {
+        try {
+            const response = await fetch('memories.json');
+            const data = await response.json();
+            const features = data.filter(m => m.location && m.location.latitude).map(m => ({
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: [m.location.longitude, m.location.latitude] },
+                properties: {
+                    caption: m.caption || "",
+                    front: `${FOLDER_ID}/Photos/post/${m.frontImage.path.split('/').pop()}`,
+                    back: `${FOLDER_ID}/Photos/post/${m.backImage.path.split('/').pop()}`,
+                    date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                    time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                    rawDate: m.takenTime
+                }
+            }));
+
+            map.on('load', () => {
+                map.addSource('bereal-src', { type: 'geojson', data: { type: 'FeatureCollection', features }, cluster: true, clusterMaxZoom: 20, clusterRadius: 50 });                
+                map.addLayer({ id: 'clusters', type: 'circle', source: 'bereal-src', filter: ['has', 'point_count'], paint: { 'circle-color': '#000', 'circle-radius': 22, 'circle-stroke-width': 2, 'circle-stroke-color': '#fff' } });
+                map.addLayer({ id: 'cluster-count', type: 'symbol', source: 'bereal-src', filter: ['has', 'point_count'], layout: { 'text-field': '{point_count}', 'text-size': 14 }, paint: { 'text-color': '#fff' } });
+                map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-color': '#fff', 'circle-radius': 8, 'circle-stroke-width': 2, 'circle-stroke-color': '#000' } });
+
+                const clickFn = (e) => {
+    const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+    
+    if (features.length > 0) {
+        const feature = features[0];
+        const clusterId = feature.properties.cluster_id;
+        const source = map.getSource('bereal-src');
+
+        source.getClusterExpansionZoom(clusterId, (err, expansionZoom) => {
+            if (err) return;
+
+            // On récupère les photos du groupe
+            source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+                if (err || !leaves) return;
+
+                // LOGIQUE ZOOM : Si on est déjà au max ou si le groupe ne s'éclate pas
+                if (map.getZoom() >= 14.5 || expansionZoom > 15) {
+                    
+                    // --- LOGIQUE TRI ---
+                    let photos = leaves.map(l => l.properties);
+                    photos.sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+                    // -------------------
+
+                    startModal(photos);
+                } else {
+                    map.easeTo({
+                        center: feature.geometry.coordinates,
+                        zoom: expansionZoom
+                    });
+                }
+            });
+        });
+    } else {
+        const p = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] });
+        if (p.length > 0) {
+            // Même pour un point seul, on l'envoie dans un tableau
+            startModal([p[0].properties]);
+        }
+    }
+};
+                map.on('click', 'clusters', clickFn); map.on('click', 'unclustered-point', clickFn);
+            });
+        } catch (e) { console.error(e); }
+    }
+
+    function startModal(photos) {
+        currentPhotos = photos; currentIndex = 0;
+        updateModalContent();
+        
+        // 1. Afficher le modal
+        document.getElementById('bereal-modal').style.display = 'flex';
+        
+        // 2. Transformer la MAP pour l'effet LiquidGlass
+        const mapEl = document.getElementById('map');
+        mapEl.style.transform = 'scale(1.1)'; // Léger zoom pour immersion
+        mapEl.style.filter = 'blur(5px) saturate(160%) brightness(0.5)'; // Le vrai effet est ici
+    }
+
+    function updateModalContent() {
+        const p = currentPhotos[currentIndex];
+        isFlipped = false;
+        document.getElementById('main-photo').src = p.back;
+        document.getElementById('mini-photo').src = p.front;
+        document.getElementById('modal-caption').innerText = p.caption || "allez le rugby";
+        document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
+        miniBox.style.left = '12px'; miniBox.style.top = '12px';
+        const multi = currentPhotos.length > 1;
+        document.getElementById('prevBtn').style.display = (multi && currentIndex > 0) ? 'flex' : 'none';
+        document.getElementById('nextBtn').style.display = (multi && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
+    }
+
+    function flipImages() {
+        isFlipped = !isFlipped;
+        const p = currentPhotos[currentIndex];
+        document.getElementById('main-photo').src = isFlipped ? p.front : p.back;
+        document.getElementById('mini-photo').src = isFlipped ? p.back : p.front;
+    }
+
+    function nextPhoto() { if(currentIndex < currentPhotos.length - 1) { currentIndex++; updateModalContent(); } }
+    function prevPhoto() { if(currentIndex > 0) { currentIndex--; updateModalContent(); } }
+    
+    function closeModal() { 
+        // Si on est en train de draguer, on n'autorise pas la fermeture
+        if (isDragging) return;
+
+        document.getElementById('bereal-modal').style.display = 'none'; 
+        const mapEl = document.getElementById('map');
+        mapEl.style.transform = 'scale(1)';
+        mapEl.style.filter = 'none';
+    }
+
+    init();
+</script>
+</body>
+</html>
