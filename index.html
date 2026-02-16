@@ -89,6 +89,25 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        /* Modification pour corriger le bug Safari */
+        .main-img, .mini-img { 
+            width: 100% !important; 
+            height: 100% !important; 
+            object-fit: cover; 
+            /* Ajout de ces lignes spécifiques pour Safari */
+            position: absolute;
+            top: 0;
+            left: 0;
+            -webkit-transform: translateZ(0); /* Force l'accélération matérielle */
+            pointer-events: none;
+        }
+
+        /* On s'assure que les containers ont une position relative pour le position absolute des images */
+        .bereal-container, .mini-img-container {
+            position: relative;
+            -webkit-mask-image: -webkit-radial-gradient(white, black); /* Force Safari à respecter le border-radius */
+        }
+
         /* --- FOOTER & TEXT --- */
         .bereal-footer { 
             width: 100%; text-align: center; color: white; padding-top: 10px; 
