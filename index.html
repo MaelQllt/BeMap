@@ -10,6 +10,8 @@
     <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -44,6 +46,34 @@
                 <div id="modal-caption" class="bereal-caption"></div>
                 <div id="modal-metadata" class="bereal-metadata"></div>
                 <div class="bereal-username">Chargement...</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-modal" class="modal-overlay" onclick="closeDashboard()">
+        <div class="dashboard-content" onclick="event.stopPropagation()">
+            <div class="dashboard-header">
+                <span class="dashboard-title">My BeReal.</span>
+                <button class="close-dash" onclick="closeDashboard()">×</button>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-countries">0</span>
+                    <span class="stat-label">PAYS</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-deps">0</span>
+                    <span class="stat-label">DÉPARTEMENTS</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-streak">0</span>
+                    <span class="stat-label">MEMORIES</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="stat-ontime">0%</span>
+                    <span class="stat-label">À L'HEURE</span>
+                </div>
             </div>
         </div>
     </div>

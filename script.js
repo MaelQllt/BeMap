@@ -15,6 +15,7 @@ let isDragging = false, dragStartX, dragStartY, hasDragged = false, justFinished
 let isZooming = false, zoomScale = 1, zoomOriginX = 50, zoomOriginY = 50;
 let translateX = 0, translateY = 0;
 let lastMouseX, lastMouseY;
+let cachedStats = null;
 
 // Stockage pour les chiffres Inter (HTML Markers)
 let clusterMarkers = {};
@@ -45,13 +46,132 @@ function animateBadge() {
 
 // Lancer l'animation
 animateBadge();
+// Au début du fichier, ajoute cette variable pour suivre si on a bougé pendant le clic
+let badgeMoved = false;
 
 badge.addEventListener('mousedown', (e) => {
     isDraggingBadge = true;
+    badgeMoved = false; // Reset au début du clic
     mouseX = e.clientX;
     mouseY = e.clientY;
     e.preventDefault();
 });
+
+// Remplace ton badge.addEventListener('click') par celui-ci :
+badge.addEventListener('click', (e) => {
+    // Si la souris a bougé de moins de 5 pixels, c'est un clic, pas un drag
+    if (Math.abs(targetX) < 5 && Math.abs(targetY) < 5) {
+        openDashboard();
+    }
+});
+
+
+function updateDashboardUI() {
+    if (!cachedStats) return;
+
+    // On ne récupère que les compteurs de stats
+    const streakEl = document.getElementById('stat-streak');
+    const ontimeEl = document.getElementById('stat-ontime');
+    const countriesEl = document.getElementById('stat-countries');
+    const depsEl = document.getElementById('stat-deps');
+
+    // Mise à jour sécurisée des éléments restants
+    if (streakEl) streakEl.innerText = cachedStats.total;
+    if (ontimeEl) ontimeEl.innerText = `${cachedStats.percent}%`;
+    if (countriesEl) countriesEl.innerText = cachedStats.countries;
+    if (depsEl) depsEl.innerText = cachedStats.deps;
+}
+
+async function openDashboard() {
+    const dash = document.getElementById('dashboard-modal');
+    dash.style.display = 'flex';
+    
+    document.getElementById('map').style.cssText = 'transform: scale(1.05); filter: blur(3px) brightness(0.4);';
+    document.querySelector('.user-profile-header').style.opacity = '0';
+    document.querySelector('.user-profile-header').style.pointerEvents = 'none';
+    
+    // Si les stats sont prêtes, on les affiche. 
+    // Si elles ne sont pas encore prêtes (connexion lente), elles s'afficheront 
+    // automatiquement dès que calculateStats() aura fini grâce à updateDashboardUI()
+    if (cachedStats) {
+        updateDashboardUI();
+    }
+}
+
+function closeDashboard() {
+    document.getElementById('dashboard-modal').style.display = 'none';
+    document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
+    document.querySelector('.user-profile-header').style.opacity = '1';
+    document.querySelector('.user-profile-header').style.pointerEvents = 'auto';
+}
+
+
+async function calculateStats() {
+    try {
+        const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
+        const data = await memoriesRes.json();
+
+        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
+        const total = validMemories.length;
+        const onTimeCount = validMemories.filter(m => m.isLate === false).length;
+        const percentOnTime = total > 0 ? Math.round((onTimeCount / total) * 100) : 0;
+
+        const uniquePoints = [];
+        const seen = new Set();
+        validMemories.forEach(m => {
+            const key = `${m.location.latitude.toFixed(3)},${m.location.longitude.toFixed(3)}`;
+            if (!seen.has(key)) {
+                seen.add(key);
+                uniquePoints.push([m.location.longitude, m.location.latitude]);
+            }
+        });
+
+        // Chargement des GeoJSON
+        const [respWorld, respDeps] = await Promise.all([
+            fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
+            fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
+        ]);
+        
+        const worldGeo = await respWorld.json();
+        const depsGeo = await respDeps.json();
+
+        const foundCountries = new Set();
+        const foundDeps = new Set();
+
+        uniquePoints.forEach(coords => {
+            const pt = turf.point(coords);
+            for (let country of worldGeo.features) {
+                if (turf.booleanPointInPolygon(pt, country)) {
+                    foundCountries.add(country.properties.ADMIN || country.properties.name);
+                    break; 
+                }
+            }
+            if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 51) {
+                for (let dep of depsGeo.features) {
+                    if (turf.booleanPointInPolygon(pt, dep)) {
+                        foundDeps.add(dep.properties.nom);
+                        break;
+                    }
+                }
+            }
+        });
+
+        // ON SAUVEGARDE DANS LE CACHE
+        cachedStats = {
+            total: total,
+            percent: percentOnTime,
+            countries: foundCountries.size || (total > 0 ? 1 : 0),
+            deps: foundDeps.size
+            // On a viré la propriété "list" ici
+        };
+
+        // On met à jour l'UI tout de suite (au cas où le dashboard serait déjà ouvert)
+        updateDashboardUI();
+
+    } catch (e) {
+        console.error("Erreur Stats:", e);
+    }
+}
 
 document.addEventListener('mousemove', (e) => {
     if (!isDraggingBadge) return;
@@ -147,6 +267,8 @@ async function init() {
 
         if (map.loaded()) setupMapLayers(features);
         else map.on('load', () => setupMapLayers(features));
+
+        calculateStats();
 
     } catch (e) {
         console.error("Erreur d'initialisation:", e);
