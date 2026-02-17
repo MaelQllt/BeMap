@@ -420,17 +420,59 @@ document.addEventListener('mouseup', (e) => {
     if (isZooming) { justFinishedDrag = true; resetZoomState(); setTimeout(() => justFinishedDrag = false, 300); }
 });
 
-function updateTransform() { mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`; }
+function updateTransform() {
+    // 1. Calcul de la zone visible supplémentaire créée par le zoom
+    // (Largeur zoomée - Largeur conteneur) / 2
+    const maxTx = (container.offsetWidth * (zoomScale - 1)) / 2;
+    const maxTy = (container.offsetHeight * (zoomScale - 1)) / 2;
+
+    // 2. On bloque (clamp) les valeurs pour ne jamais dépasser ces bords
+    // On divise par zoomScale car le translate est multiplié par le scale en CSS
+    const clampX = maxTx / zoomScale;
+    const clampY = maxTy / zoomScale;
+
+    translateX = Math.max(-clampX, Math.min(translateX, clampX));
+    translateY = Math.max(-clampY, Math.min(translateY, clampY));
+
+    // 3. On applique la transformation
+    mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
+}
+
 function resetZoomState() { isZooming = false; zoomScale = 1; translateX = 0; translateY = 0; mainPhoto.style.transform = 'scale(1) translate(0,0)'; photoContainer.classList.remove('zoomed'); }
 function startZoom(x, y) {
-    isZooming = true; const rect = photoContainer.getBoundingClientRect();
-    zoomOriginX = ((x - rect.left) / rect.width) * 100; zoomOriginY = ((y - rect.top) / rect.height) * 100;
-    mainPhoto.style.transformOrigin = `${zoomOriginX}% ${zoomOriginY}%`;
-    lastMouseX = x; lastMouseY = y; zoomScale = 2.5; mainPhoto.style.transition = 'transform 0.25s ease-out';
-    updateTransform(); photoContainer.classList.add('zoomed');
+    if (isZooming) return;
+    isZooming = true;
+    
+    // On fixe l'origine au centre pour éviter les décalages imprévisibles
+    mainPhoto.style.transformOrigin = `50% 50%`;
+    
+    lastMouseX = x;
+    lastMouseY = y;
+    
+    // Position initiale : pas de décalage
+    translateX = 0;
+    translateY = 0;
+    
+    zoomScale = 2.5; 
+    mainPhoto.style.transition = 'transform 0.25s ease-out';
+    
+    updateTransform();
+    photoContainer.classList.add('zoomed');
 }
-function handlePan(x, y) { translateX += (x - lastMouseX) / zoomScale; translateY += (y - lastMouseY) / zoomScale; lastMouseX = x; lastMouseY = y; mainPhoto.style.transition = 'none'; updateTransform(); }
+function handlePan(x, y) {
+    // On calcule le mouvement relatif
+    const deltaX = (x - lastMouseX) / zoomScale;
+    const deltaY = (y - lastMouseY) / zoomScale;
 
+    translateX += deltaX;
+    translateY += deltaY;
+
+    lastMouseX = x;
+    lastMouseY = y;
+
+    mainPhoto.style.transition = 'none'; // Pas de délai pendant le mouvement
+    updateTransform();
+}
 photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mini-img-container')) startZoom(e.clientX, e.clientY); });
 
 init();
