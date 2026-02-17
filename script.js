@@ -688,4 +688,24 @@ function handlePan(x, y) {
 }
 photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mini-img-container')) startZoom(e.clientX, e.clientY); });
 
+
+// --- ANIMATION FLAMME EMBARQUÉE ---
+const flameContainer = document.getElementById('lottie-container');
+
+// On définit l'animation directement en JSON (version allégée)
+const flameData = {"v":"5.5.7","fr":30,"ip":0,"op":60,"w":50,"h":50,"nm":"Flame","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Flame","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[25,25,0],"ix":2},"a":{"a":0,"k":[0,0,0],"ix":1},"s":{"a":1,"k":[{"i":{"x":[0.667,0.667,0.667],"y":[1,1,1]},"o":{"x":[0.333,0.333,0.333],"y":[0,0,0]},"t":0,"s":[100,100,100]},{"i":{"x":[0.667,0.667,0.667],"y":[1,1,1]},"o":{"x":[0.333,0.333,0.333],"y":[0,0,0]},"t":30,"s":[105,115,100]},{"t":60,"s":[100,100,100]}],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"d":1,"ty":"el","s":{"a":0,"k":[30,40],"ix":2},"p":{"a":0,"k":[0,0],"ix":3},"nm":"Circle Path","mn":"ADBE Vector Shape - Ellipse","hd":false},{"ty":"fl","c":{"a":0,"k":[1,0.5,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[0,5],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":0,"s":[-2]},{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":30,"s":[2]},{"t":60,"s":[-2]}],"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transform"}],"nm":"Flame Shape","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":60,"st":0,"bm":0}]}
+
+if (flameContainer) {
+    const animation = lottie.loadAnimation({
+        container: flameContainer,
+        renderer: 'svg',
+        loop: true,
+        autoplay: false,
+        animationData: flameData // ON UTILISE LES DATA DIRECTEMENT, PLUS DE FICHIER EXTERNE !
+    });
+
+    flameContainer.addEventListener('mouseenter', () => animation.play());
+    flameContainer.addEventListener('mouseleave', () => animation.stop());
+}
+
 init();

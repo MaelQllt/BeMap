@@ -44,7 +44,7 @@ body {
     border-radius: 24px; overflow: hidden; background: var(--card-bg);
     box-shadow: 0 40px 100px rgba(0,0,0,0.9);
     /* Bordure par défaut (Late ou standard) */
-    border: 1px solid rgba(255,255,255,0.2); 
+    border: 1.5px solid rgba(255,255,255,0.2); 
     cursor: zoom-in; touch-action: none;
     mask-image: radial-gradient(white, black);
     -webkit-mask-image: -webkit-radial-gradient(white, black);
@@ -119,6 +119,7 @@ body {
 
 /* --- LE POINT BLANC (Visuel interne) --- */
 .custom-point-marker {
+    position: relative;
     width: 14px;
     height: 14px;
     background-color: #f1f1f1;
@@ -129,6 +130,21 @@ body {
     pointer-events: auto;
 }
 
+/* ZONE DE CLICK ÉTENDUE */
+.custom-point-marker::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* On crée une zone invisible de 40px autour du point de 14px */
+    width: 40px; 
+    height: 40px;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
+}
+
 /* AU SURVOL : On fait gonfler l'élément interne uniquement */
 .marker-anchor:hover .custom-point-marker {
     transform: scale(1.4); 
@@ -137,6 +153,7 @@ body {
 
 /* --- LE CLUSTER (Visuel interne) --- */
 .custom-cluster-label {
+    position: relative;
     width: 36px;
     height: 36px;
     background-color: #151517;
@@ -151,6 +168,21 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ZONE DE CLICK ÉTENDUE POUR CLUSTER */
+.custom-cluster-label::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    /* Zone de 60px pour un cluster de 36px */
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: transparent;
+    cursor: pointer;
 }
 
 .marker-anchor:hover .custom-cluster-label {
@@ -412,8 +444,33 @@ body {
     color: #1a1a1a;
 }
 
+.streak-card:hover{
+    color: #000000;
+    transform: scale(1.02);
+}
+
+.streak-card:hover .streak-label{
+    color: #000000;
+    transform: scale(1.02);
+}
+
 .streak-icon {
     font-size: 40px;
+    display: inline-block;
+    transform-origin: bottom center;
+    cursor: pointer;
+    /* On active les événements uniquement sur l'icône */
+    pointer-events: auto; 
+    transition: transform 0.3s ease;
+    /* On définit une zone de survol un peu plus large pour que l'animation ne "sorte" pas de la souris */
+    padding: 10px;
+    margin: -10px;
+}
+
+/* L'animation ne se déclenche QUE si on survole l'icône elle-même */
+.streak-icon:hover {
+    animation: flameWobble 0.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(255, 100, 0, 0.5));
 }
 
 .streak-card:hover{
@@ -424,4 +481,13 @@ body {
 .streak-card:hover .streak-label{
     color: #000000;
     transform: scale(1.02);
+}
+
+
+@keyframes flameWobble {
+    0% { transform: scale(1) rotate(-5deg); }
+    25% { transform: scale(1.1) rotate(3deg); }
+    50% { transform: scale(1.05) rotate(-3deg); }
+    75% { transform: scale(1.15) rotate(2deg); }
+    100% { transform: scale(1) rotate(-5deg); }
 }
