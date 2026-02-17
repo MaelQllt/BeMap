@@ -102,35 +102,64 @@ body {
     .bereal-username { font-size: 38px; }
 }
 
-/* Ombrage points */
+/* L'ancre gérée par MapLibre (on ne touche pas au transform ici) */
+.marker-anchor {
+    width: auto;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+}
+
+/* On monte le z-index de toute l'ancre au survol pour qu'il passe devant les autres */
+.marker-anchor:hover {
+    z-index: 999;
+}
+
+/* --- LE POINT BLANC (Visuel interne) --- */
 .custom-point-marker {
     width: 14px;
     height: 14px;
-    background-color: #ffffff;
+    background-color: #f1f1f1;
     border-radius: 50%;
     border: 1px solid rgba(0, 0, 0, 0.2);
-    /* Ombre portée identique pour la cohérence */
     box-shadow: 0 3px 6px rgba(0, 0, 0, 0.8);
-    pointer-events: none;
-    user-select: none;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+    pointer-events: auto;
 }
 
+/* AU SURVOL : On fait gonfler l'élément interne uniquement */
+.marker-anchor:hover .custom-point-marker {
+    transform: scale(1.4); 
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 -3px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* --- LE CLUSTER (Visuel interne) --- */
 .custom-cluster-label {
-    font-family: 'Inter', sans-serif;
-    font-weight: 550;
-    color: white;
-    font-size: 13px;
     width: 36px;
     height: 36px;
+    background-color: #151517;
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-weight: 550;
+    font-size: 13px;
     display: flex;
     align-items: center;
     justify-content: center;
     border-radius: 50%;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), 
-                0 2px 4px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-
+.marker-anchor:hover .custom-cluster-label {
+    transform: scale(1.2);
+    font-weight: 700;
+    font-size: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.9), inset 0 -4px 6px rgba(0, 0, 0, 0.4);
+}
 
 /* --- BADGE PROFIL HAUT GAUCHE --- */
 .user-profile-header {

@@ -406,13 +406,18 @@ function setupMapLayers(features) {
 
             if (!clusterMarkers[id]) {
                 const el = document.createElement('div');
+                el.className = 'marker-anchor'; // C'est lui que MapLibre va déplacer
+
+                const inner = document.createElement('div'); // C'est lui qui va gonfler
                 if (props.cluster) {
-                    el.className = 'custom-cluster-label';
-                    el.innerText = props.point_count;
+                    inner.className = 'custom-cluster-label';
+                    inner.innerText = props.point_count;
                 } else {
-                    el.className = 'custom-point-marker';
+                    inner.className = 'custom-point-marker';
                 }
                 
+                el.appendChild(inner); // On met le visuel dans l'ancre
+
                 clusterMarkers[id] = new maplibregl.Marker({
                     element: el,
                     anchor: 'center'
