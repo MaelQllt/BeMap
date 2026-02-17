@@ -1,0 +1,123 @@
+/* --- VARIABLES & BASE --- */
+:root {
+    --bg-color: #000;
+    --card-bg: #1c1c1e;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+}
+
+body { 
+    margin: 0; padding: 0; 
+    font-family: 'Inter', sans-serif; 
+    background: var(--bg-color); 
+    overflow: hidden;
+}
+
+/* --- CARTE --- */
+#map { 
+    position: absolute; top: 0; bottom: 0; width: 100%; 
+    transition: transform 0.7s cubic-bezier(0.19, 1, 0.22, 1), filter 0.7s cubic-bezier(0.19, 1, 0.22, 1);
+    will-change: transform, filter;
+}
+
+/* --- MODAL --- */
+#bereal-modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    display: none; justify-content: center; align-items: center;
+    z-index: 9999; background: transparent;
+}
+
+.modal-content { 
+    width: 90%; max-width: 420px; 
+    position: relative; display: flex; flex-direction: column; align-items: center; 
+    animation: modalScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+}
+
+@keyframes modalScale {
+    from { transform: scale(0.9); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+/* --- PHOTOS (MAIN & MINI) --- */
+.bereal-container {
+    position: relative; width: 100%; aspect-ratio: 3/4;
+    border-radius: 24px; overflow: hidden; background: var(--card-bg);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.9);
+    border: 1px solid rgba(255,255,255,0.2);
+    cursor: zoom-in; touch-action: none;
+    mask-image: radial-gradient(white, black);
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+}
+
+.main-img, .mini-img { 
+    width: 100% !important; height: 100% !important; 
+    object-fit: cover; position: absolute; top: 0; left: 0;
+    transform: translateZ(0); -webkit-transform: translateZ(0);
+    pointer-events: none;
+}
+
+.mini-img-container {
+    position: absolute; top: 14px; left: 14px; width: 30%; aspect-ratio: 3/4; 
+    border-radius: 14px; z-index: 10; border: 2px solid #000; 
+    overflow: hidden; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+/* --- ÉTATS ZOOM --- */
+.bereal-container.zoomed { cursor: zoom-out; }
+.bereal-container.zoomed .mini-img-container { opacity: 0; transform: scale(0.85); pointer-events: none; }
+
+/* --- TEXTES & FOOTER --- */
+.bereal-footer { width: 100%; text-align: center; color: white; padding-top: 10px; pointer-events: none; }
+.bereal-caption { font-size: 12px; font-weight: 400; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+.bereal-metadata { font-size: 9px; color: var(--text-secondary); font-weight: 300; margin-bottom: 12px; }
+.bereal-username { font-size: 35px; font-weight: 700; text-transform: uppercase; line-height: 0.9; }
+.bereal-logo-overlay {
+    position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.5); font-weight: 600; font-size: 18px; 
+    letter-spacing: -0.5px; pointer-events: none;
+}
+
+/* --- NAVIGATION --- */
+.nav-arrow {
+    position: absolute; top: 50%; transform: translateY(-110%);
+    background: rgba(255, 255, 255, 0.15); border: none; color: white; 
+    width: 50px; height: 50px; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; z-index: 100;
+    backdrop-filter: blur(15px);
+}
+.prev { left: -70px; } .next { right: -70px; }
+.nav-arrow svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2.5; }
+
+@media (max-width: 600px) {
+    .nav-arrow { display: none !important; }
+    .bereal-username { font-size: 38px; }
+}
+
+/* Ombrage points */
+.custom-point-marker {
+    width: 14px;
+    height: 14px;
+    background-color: #ffffff;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    /* Ombre portée identique pour la cohérence */
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+    user-select: none;
+}
+
+.custom-cluster-label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 550;
+    color: white;
+    font-size: 13px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8), 
+                0 2px 4px rgba(0, 0, 0, 0.5);
+}
