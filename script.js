@@ -157,50 +157,52 @@ async function calculateStats() {
         const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
         const data = await memoriesRes.json();
 
-        // 1. CALCUL DE LA STREAK (Sur TOUS les BeReal, avec ou sans GPS)
-        const days = data
-            .filter(m => m.date)
-            .map(m => m.date.split('T')[0])
-            .sort();
-
+        // --- 1. CALCUL DE LA STREAK ---
+        const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
         const uniqueDays = [...new Set(days)];
-        
-        let maxStreak = 0;
-        let currentStreak = 0;
-        let streakStartDate = uniqueDays[0];
-
+        let maxStreak = 0, currentStreak = 0;
         for (let i = 0; i < uniqueDays.length; i++) {
-            if (i === 0) {
-                currentStreak = 1;
-                streakStartDate = uniqueDays[i];
-            } else {
-                const prev = new Date(uniqueDays[i - 1]);
-                const curr = new Date(uniqueDays[i]);
-                const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
-
-                if (diffDays === 1) {
-                    currentStreak++;
-                } else {
-                    if (currentStreak > maxStreak) maxStreak = currentStreak;
-                    currentStreak = 1;
-                    streakStartDate = uniqueDays[i];
-                }
+            if (i === 0) currentStreak = 1;
+            else {
+                const diffDays = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
+                if (diffDays === 1) currentStreak++;
+                else { maxStreak = Math.max(maxStreak, currentStreak); currentStreak = 1; }
             }
-            if (currentStreak > maxStreak) maxStreak = currentStreak;
+            maxStreak = Math.max(maxStreak, currentStreak);
         }
 
-        // 2. FILTRAGE POUR LA CARTE ET LA GÉO
-        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
+        // --- 2. CALCUL DE LA PONCTUALITÉ (AVEC LOGS) ---
+        const momentsMap = {};
+        data.forEach(m => {
+            // On utilise berealMoment (l'ID de l'alerte). S'il n'existe pas, on prend la date.
+            const momentId = m.berealMoment || m.date.split('T')[0];
+            if (!momentsMap[momentId]) momentsMap[momentId] = [];
+            momentsMap[momentId].push(m);
+        });
 
-        // --- CALCUL GÉO (TURF) ---
+        const momentIds = Object.keys(momentsMap);
+        const totalMoments = momentIds.length;
+        let onTimeMomentsCount = 0;
+
+        momentIds.forEach(id => {
+            const photosDuMoment = momentsMap[id];
+            // Un moment est "On Time" si AU MOINS UNE photo n'est pas "late"
+            const isAnyOnTime = photosDuMoment.some(m => m.isLate === false);
+            
+            if (isAnyOnTime) {
+                onTimeMomentsCount++;
+            }
+        });
+
+        const onTimePercent = totalMoments > 0 ? Math.round((onTimeMomentsCount / totalMoments) * 100) : 0;
+
+        // --- 3. GÉOGRAPHIE ---
+        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
         const uniqueGeoPoints = [];
         const seenGeo = new Set();
         validMemories.forEach(m => {
             const key = `${m.location.latitude.toFixed(3)},${m.location.longitude.toFixed(3)}`;
-            if (!seenGeo.has(key)) {
-                seenGeo.add(key);
-                uniqueGeoPoints.push([m.location.longitude, m.location.latitude]);
-            }
+            if (!seenGeo.has(key)) { seenGeo.add(key); uniqueGeoPoints.push([m.location.longitude, m.location.latitude]); }
         });
 
         const [respWorld, respDeps] = await Promise.all([
@@ -220,10 +222,10 @@ async function calculateStats() {
             }
         });
 
-        // 3. MISE À JOUR CACHE & UI
+        // --- 4. MISE À JOUR ---
         cachedStats = {
-            total: data.length, // Affiche 1393 ici
-            percent: data.length > 0 ? Math.round((data.filter(m => !m.isLate).length / data.length) * 100) : 0,
+            total: data.length,
+            percent: onTimePercent,
             countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0),
             deps: foundDeps.size,
             maxStreak: maxStreak
@@ -290,18 +292,11 @@ async function init() {
         const userRes = await fetch(`${FOLDER_NAME}/user.json`);
         if (userRes.ok) {
             const userData = await userRes.json();
-            
             if (userData.username) {
-                // Met à jour le badge en haut à gauche
                 document.getElementById('header-username').innerText = userData.username;
-                
-                // Met à jour le nom dans la MODAL (important pour enlever "Chargement...")
                 const modalUsername = document.querySelector('.bereal-username');
-                if (modalUsername) {
-                    modalUsername.innerText = userData.username;
-                }
+                if (modalUsername) modalUsername.innerText = userData.username;
             }
-            
             const profilePath = `${FOLDER_NAME}/Photos/profile/X9u-3RqfGd2xcaU0NYSDe.webp`;
             document.getElementById('profile-pic').src = profilePath;
         }
@@ -309,24 +304,38 @@ async function init() {
         const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
         if (!memoriesRes.ok) throw new Error("Fichier memories.json introuvable");
         const data = await memoriesRes.json();
+
+        const momentCounts = {};
         
-        const features = data
-            .filter(m => m.location && m.location.latitude)
-            .map(m => ({
+        // --- MODIFICATION ICI : On garde tout le monde ---
+        const features = data.map(m => {
+            const momentId = m.berealMoment || m.date.split('T')[0];
+            const isBonus = momentCounts[momentId] ? true : false;
+            momentCounts[momentId] = true;
+            const hasLocation = m.location && m.location.latitude && m.location.longitude;
+            const coords = hasLocation 
+                ? [parseFloat(m.location.longitude), parseFloat(m.location.latitude)] 
+                : [0, 0]; // Direction Null Island !
+
+            return {
                 type: 'Feature',
                 geometry: { 
                     type: 'Point', 
-                    coordinates: [parseFloat(m.location.longitude), parseFloat(m.location.latitude)] 
+                    coordinates: coords 
                 },
                 properties: {
-                    caption: m.caption || "Sans légende",
+                    caption: m.caption || (hasLocation ? "Sans légende" : "⚠️ Sans GPS - " + (m.caption || "")),
                     front: `${FOLDER_NAME}/Photos/post/${m.frontImage.path.split('/').pop()}`,
                     back: `${FOLDER_NAME}/Photos/post/${m.backImage.path.split('/').pop()}`,
                     date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
                     time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                    rawDate: m.takenTime
+                    rawDate: m.takenTime,
+                    noGps: !hasLocation, // Petit flag pour savoir si c'est un point sans GPS
+                    isLate: m.isLate,
+                    isBonus: isBonus
                 }
-            }));
+            };
+        });
 
         if (map.loaded()) setupMapLayers(features);
         else map.on('load', () => setupMapLayers(features));
@@ -428,27 +437,32 @@ function setupMapLayers(features) {
     map.on('click', 'clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         const clusterId = features[0].properties.cluster_id;
+        const coords = features[0].geometry.coordinates;
         const source = map.getSource('bereal-src');
 
-        // Si on est déjà au zoom 13.5 ou plus, on ouvre la modal direct
-        // car le cluster ne se divisera plus (clusterMaxZoom: 14)
-        if (map.getZoom() >= 13.5) {
+        // CONDITION SPÉCIALE POUR NULL ISLAND [0, 0]
+        // Si on clique sur le point 0,0 (ou très proche), on ouvre direct
+        const isNullIsland = Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1;
+
+        if (isNullIsland || map.getZoom() >= 13.5) {
             source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
                 if (err) return;
+                // On trie par date pour avoir les plus récents en premier
                 openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
             });
         } else {
-            // Sinon on zoom pour s'approcher
+            // Sinon on zoom normalement pour disperser les vrais clusters géo
             source.getClusterExpansionZoom(clusterId, (err, zoom) => {
                 if (err) return;
                 map.easeTo({ 
-                    center: features[0].geometry.coordinates, 
+                    center: coords, 
                     zoom: Math.min(zoom, 14.5) 
                 });
             });
         }
     });
 
+    // On n'oublie pas le clic sur un point isolé à 0,0 (si un seul BeReal n'a pas de GPS)
     map.on('click', 'unclustered-point', (e) => {
         openModal([e.features[0].properties]);
     });
@@ -542,11 +556,22 @@ function openModal(photos) {
 
 function updateModalContent() {
     const p = currentPhotos[currentIndex];
-    isFlipped = false; resetZoomState();
+    isFlipped = false; 
+    resetZoomState();
+    
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption;
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
+    
+    // --- GESTION DE LA BORDURE DYNAMIQUE ---
+    if (p.isLate === false && p.isBonus === false) {
+        container.classList.add('on-time');
+    } else {
+        container.classList.remove('on-time');
+    }
+    // ---------------------------------------
+
     miniBox.style.cssText = 'transition: none; left: 14px; top: 14px;';
     document.getElementById('prevBtn').style.display = (currentPhotos.length > 1 && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (currentPhotos.length > 1 && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';

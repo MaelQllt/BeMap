@@ -43,10 +43,18 @@ body {
     position: relative; width: 100%; aspect-ratio: 3/4;
     border-radius: 24px; overflow: hidden; background: var(--card-bg);
     box-shadow: 0 40px 100px rgba(0,0,0,0.9);
-    border: 1px solid rgba(255,255,255,0.2);
+    /* Bordure par défaut (Late ou standard) */
+    border: 1px solid rgba(255,255,255,0.2); 
     cursor: zoom-in; touch-action: none;
     mask-image: radial-gradient(white, black);
     -webkit-mask-image: -webkit-radial-gradient(white, black);
+    transition: border 0.3s ease, box-shadow 0.3s ease; /* Pour une transition douce */
+}
+
+/* --- ÉTAT ON-TIME (Bordure blanche épaisse) --- */
+.bereal-container.on-time {
+    border: 2px solid #ffffff; 
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.15), 0 40px 100px rgba(0,0,0,0.9);
 }
 
 .main-img, .mini-img { 
@@ -123,6 +131,7 @@ body {
 }
 
 
+
 /* --- BADGE PROFIL HAUT GAUCHE --- */
 .user-profile-header {
     position: fixed;
@@ -194,7 +203,7 @@ body {
     color: white;
     font-family: 'Inter', sans-serif;
     font-size: 14px;
-    font-weight: 200; 
+    font-weight: 300; 
     text-transform: lowercase;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
     letter-spacing: -0.3px;
@@ -207,13 +216,13 @@ body {
 #header-username::before {
     content: "\\";
     margin-right: 1px;
-    font-weight: 400;
+    font-weight: 450;
 }
 
 /* Optionnel : on peut rendre le texte un peu plus brillant au survol */
 .user-profile-header:hover #header-username {
     opacity: 1;
-    font-weight: 300;
+    font-weight: 400;
 }
 
 
