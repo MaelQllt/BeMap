@@ -23,44 +23,87 @@ let clusterMarkers = {};
 /**
  * --- DRAG PROFILE ---
  */
-
 const badge = document.querySelector('.user-profile-header');
-let mouseX = 0, mouseY = 0; // Position de la souris
-let badgeX = 0, badgeY = 0; // Position actuelle du badge
-let targetX = 0, targetY = 0; // Position cible (où le badge veut aller)
+let mouseX = 0, mouseY = 0; 
+let badgeX = 0, badgeY = 0; 
+let targetX = 0, targetY = 0; 
 let isDraggingBadge = false;
 
-// Puissance de l'aimant/inertie (0.1 = très fluide/lent, 0.3 = plus réactif)
+// VARIABLES POUR DISTINGUER CLIC ET DRAG
+let hasMovedBadge = false; 
+let startX, startY; 
+
 const friction = 0.3; 
 
 function animateBadge() {
-    // Si on drag, le badge "chasse" la souris avec inertie
-    // Si on relâche, targetX et targetY sont à 0, donc il revient à l'origine
     badgeX += (targetX - badgeX) * friction;
     badgeY += (targetY - badgeY) * friction;
-
     badge.style.transform = `translate(${badgeX}px, ${badgeY}px)`;
-    
     requestAnimationFrame(animateBadge);
 }
-
-// Lancer l'animation
 animateBadge();
-// Au début du fichier, ajoute cette variable pour suivre si on a bougé pendant le clic
-let badgeMoved = false;
 
+// SOURIS (DESKTOP)
 badge.addEventListener('mousedown', (e) => {
     isDraggingBadge = true;
-    badgeMoved = false; // Reset au début du clic
+    hasMovedBadge = false; // On reset
+    startX = e.clientX; 
+    startY = e.clientY;
     mouseX = e.clientX;
     mouseY = e.clientY;
     e.preventDefault();
 });
 
-// Remplace ton badge.addEventListener('click') par celui-ci :
+document.addEventListener('mousemove', (e) => {
+    if (!isDraggingBadge) return;
+    
+    // Si on bouge de plus de 5 pixels, on considère que c'est un déplacement
+    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
+        hasMovedBadge = true;
+    }
+
+    targetX = e.clientX - mouseX;
+    targetY = e.clientY - mouseY;
+});
+
+document.addEventListener('mouseup', () => {
+    isDraggingBadge = false;
+    targetX = 0;
+    targetY = 0;
+});
+
+// TACTILE (MOBILE)
+badge.addEventListener('touchstart', (e) => {
+    isDraggingBadge = true;
+    hasMovedBadge = false;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    mouseX = e.touches[0].clientX;
+    mouseY = e.touches[0].clientY;
+}, {passive: false});
+
+document.addEventListener('touchmove', (e) => {
+    if (!isDraggingBadge) return;
+    
+    if (Math.abs(e.touches[0].clientX - startX) > 5 || Math.abs(e.touches[0].clientY - startY) > 5) {
+        hasMovedBadge = true;
+    }
+
+    targetX = e.touches[0].clientX - mouseX;
+    targetY = e.touches[0].clientY - mouseY;
+    e.preventDefault();
+}, {passive: false});
+
+document.addEventListener('touchend', () => {
+    isDraggingBadge = false;
+    targetX = 0;
+    targetY = 0;
+});
+
+// LE CLIC (DÉCLENCHEUR DU DASHBOARD)
 badge.addEventListener('click', (e) => {
-    // Si la souris a bougé de moins de 5 pixels, c'est un clic, pas un drag
-    if (Math.abs(targetX) < 5 && Math.abs(targetY) < 5) {
+    // Si hasMovedBadge est vrai, ça veut dire qu'on a fait un DRAG, donc on n'ouvre rien.
+    if (!hasMovedBadge) {
         openDashboard();
     }
 });
