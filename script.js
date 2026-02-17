@@ -20,6 +20,75 @@ let lastMouseX, lastMouseY;
 let clusterMarkers = {};
 
 /**
+ * --- DRAG PROFILE ---
+ */
+
+const badge = document.querySelector('.user-profile-header');
+let mouseX = 0, mouseY = 0; // Position de la souris
+let badgeX = 0, badgeY = 0; // Position actuelle du badge
+let targetX = 0, targetY = 0; // Position cible (où le badge veut aller)
+let isDraggingBadge = false;
+
+// Puissance de l'aimant/inertie (0.1 = très fluide/lent, 0.3 = plus réactif)
+const friction = 0.3; 
+
+function animateBadge() {
+    // Si on drag, le badge "chasse" la souris avec inertie
+    // Si on relâche, targetX et targetY sont à 0, donc il revient à l'origine
+    badgeX += (targetX - badgeX) * friction;
+    badgeY += (targetY - badgeY) * friction;
+
+    badge.style.transform = `translate(${badgeX}px, ${badgeY}px)`;
+    
+    requestAnimationFrame(animateBadge);
+}
+
+// Lancer l'animation
+animateBadge();
+
+badge.addEventListener('mousedown', (e) => {
+    isDraggingBadge = true;
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+    if (!isDraggingBadge) return;
+    
+    // On calcule la distance par rapport au point de départ du clic
+    targetX = e.clientX - mouseX;
+    targetY = e.clientY - mouseY;
+});
+
+document.addEventListener('mouseup', () => {
+    isDraggingBadge = false;
+    // L'aimant : on remet la cible à 0
+    targetX = 0;
+    targetY = 0;
+});
+
+// Support Tactile
+badge.addEventListener('touchstart', (e) => {
+    isDraggingBadge = true;
+    mouseX = e.touches[0].clientX;
+    mouseY = e.touches[0].clientY;
+}, {passive: false});
+
+document.addEventListener('touchmove', (e) => {
+    if (!isDraggingBadge) return;
+    targetX = e.touches[0].clientX - mouseX;
+    targetY = e.touches[0].clientY - mouseY;
+    e.preventDefault();
+}, {passive: false});
+
+document.addEventListener('touchend', () => {
+    isDraggingBadge = false;
+    targetX = 0;
+    targetY = 0;
+});
+
+/**
  * --- INITIALISATION DE LA CARTE ---
  */
 const map = new maplibregl.Map({
@@ -27,7 +96,7 @@ const map = new maplibregl.Map({
     style: 'https://api.maptiler.com/maps/dataviz-dark/style.json?key=iYlIQdqzuS2kKjZemTWi',
     center: [2.21, 46.22], 
     zoom: 5.5, 
-    maxZoom: 15
+    maxZoom: 17
 });
 
 /**
@@ -38,7 +107,20 @@ async function init() {
         const userRes = await fetch(`${FOLDER_NAME}/user.json`);
         if (userRes.ok) {
             const userData = await userRes.json();
-            if (userData.username) usernameDisplay.innerText = userData.username.toUpperCase();
+            
+            if (userData.username) {
+                // Met à jour le badge en haut à gauche
+                document.getElementById('header-username').innerText = userData.username;
+                
+                // Met à jour le nom dans la MODAL (important pour enlever "Chargement...")
+                const modalUsername = document.querySelector('.bereal-username');
+                if (modalUsername) {
+                    modalUsername.innerText = userData.username;
+                }
+            }
+            
+            const profilePath = `${FOLDER_NAME}/Photos/profile/X9u-3RqfGd2xcaU0NYSDe.webp`;
+            document.getElementById('profile-pic').src = profilePath;
         }
 
         const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
@@ -72,15 +154,24 @@ async function init() {
 }
 
 function setupMapLayers(features) {
+    // 1. Sécurité : On vérifie si la source existe déjà pour éviter les erreurs de doublons
+    if (map.getSource('bereal-src')) return;
+
+    // 2. Création de la source avec des paramètres statiques (indispensable pour la stabilité)
     map.addSource('bereal-src', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features },
+        data: { 
+            type: 'FeatureCollection', 
+            features: features 
+        },
         cluster: true,
-        clusterMaxZoom: 14,
-        clusterRadius: 50
+        // À partir du zoom 14, MapLibre ne cherchera plus à séparer les points
+        clusterMaxZoom: 22, 
+        // Un rayon de 100px permet de garder les photos groupées même si elles sont un peu espacées
+        clusterRadius: 50 
     });
 
-    // 1. Couche Cercles Clusters (Canvas) - Garde tes couleurs exactes
+    // 3. Couche visuelle des Clusters (Cercles noirs)
     map.addLayer({
         id: 'clusters',
         type: 'circle',
@@ -94,20 +185,21 @@ function setupMapLayers(features) {
         }
     });
 
-    // 2. Couche Points isolés (Canvas) 
-    // Mise à 0 d'opacité pour laisser place au Marker HTML avec ombrage
+    // 4. Couche invisible pour les points isolés (pour laisser les Markers HTML s'afficher)
     map.addLayer({
         id: 'unclustered-point',
         type: 'circle',
         source: 'bereal-src',
         filter: ['!', ['has', 'point_count']],
         paint: { 
-            'circle-opacity': 0, // On cache le rendu canvas
-            'circle-radius': 10  // On garde une zone de clic généreuse
+            'circle-opacity': 0,
+            'circle-radius': 15 
         }
     });
 
-    // 3. Gestion des Markers HTML (Clusters + Points isolés)
+    /**
+     * --- LOGIQUE DES MARKERS HTML (Chiffres Inter et Points) ---
+     */
     map.on('render', () => {
         const newMarkers = {};
         const featuresOnScreen = map.querySourceFeatures('bereal-src');
@@ -115,20 +207,15 @@ function setupMapLayers(features) {
         for (const feature of featuresOnScreen) {
             const coords = feature.geometry.coordinates;
             const props = feature.properties;
-            
-            // On crée un ID unique pour différencier clusters et points simples
             const id = props.cluster ? `c-${props.cluster_id}` : `p-${coords.join(',')}`;
             newMarkers[id] = true;
 
             if (!clusterMarkers[id]) {
                 const el = document.createElement('div');
-                
                 if (props.cluster) {
-                    // C'est un groupe : on met le chiffre Inter
                     el.className = 'custom-cluster-label';
                     el.innerText = props.point_count;
                 } else {
-                    // C'est un point seul : on applique la classe pour l'ombrage CSS
                     el.className = 'custom-point-marker';
                 }
                 
@@ -141,7 +228,7 @@ function setupMapLayers(features) {
             }
         }
 
-        // Nettoyage
+        // Nettoyage des markers qui sortent de l'écran
         for (const id in clusterMarkers) {
             if (!newMarkers[id]) {
                 clusterMarkers[id].remove();
@@ -151,28 +238,106 @@ function setupMapLayers(features) {
     });
 
     /**
-     * --- CLICS & INTERACTION ---
+     * --- GESTION DES CLICS ---
      */
     map.on('click', 'clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         const clusterId = features[0].properties.cluster_id;
         const source = map.getSource('bereal-src');
 
-        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-            if (err) return;
-            if (map.getZoom() >= 13) {
-                source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-                    openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
+        // Si on est déjà au zoom 13.5 ou plus, on ouvre la modal direct
+        // car le cluster ne se divisera plus (clusterMaxZoom: 14)
+        if (map.getZoom() >= 13.5) {
+            source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+                if (err) return;
+                openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
+            });
+        } else {
+            // Sinon on zoom pour s'approcher
+            source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+                if (err) return;
+                map.easeTo({ 
+                    center: features[0].geometry.coordinates, 
+                    zoom: Math.min(zoom, 14.5) 
                 });
-            } else {
-                map.easeTo({ center: features[0].geometry.coordinates, zoom: zoom + 1 });
-            }
-        });
+            });
+        }
     });
 
-    map.on('click', 'unclustered-point', (e) => openModal([e.features[0].properties]));
+    map.on('click', 'unclustered-point', (e) => {
+        openModal([e.features[0].properties]);
+    });
+
+    // Curseur pointer au survol
     map.on('mouseenter', 'clusters', () => map.getCanvas().style.cursor = 'pointer');
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
+
+    watchZoomRadius(features);
+}
+
+let currentRadiusMode = 50;
+
+function watchZoomRadius(features) {
+    map.on('zoom', () => {
+        const zoom = map.getZoom();
+        let newRadius = zoom >= 15 ? 80 : 50; 
+
+        if (newRadius !== currentRadiusMode) {
+            currentRadiusMode = newRadius;
+            updateMapSource(features, newRadius);
+        }
+    });
+}
+
+function updateMapSource(features, radius) {
+    if (!map.getSource('bereal-src')) return;
+
+    // 1. On récupère les définitions des couches avant de supprimer la source
+    // car supprimer une source supprime automatiquement ses couches liées.
+    
+    // 2. On supprime les couches
+    if (map.getLayer('clusters')) map.removeLayer('clusters');
+    if (map.getLayer('unclustered-point')) map.removeLayer('unclustered-point');
+
+    // 3. On supprime la source
+    map.removeSource('bereal-src');
+
+    // 4. On recrée la source AVEC LE NOUVEAU RAYON
+    map.addSource('bereal-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: features },
+        cluster: true,
+        clusterMaxZoom: 20,
+        clusterRadius: radius
+    });
+
+    // 5. On remet les couches (on appelle une petite fonction pour éviter de dupliquer le code)
+    reAddLayers();
+
+    console.log("Source recréée avec rayon :", radius);
+}
+
+function reAddLayers() {
+    map.addLayer({
+        id: 'clusters',
+        type: 'circle',
+        source: 'bereal-src',
+        filter: ['has', 'point_count'],
+        paint: { 
+            'circle-color': '#151517', 
+            'circle-radius': 18, 
+            'circle-stroke-width': 1, 
+            'circle-stroke-color': '#d9d9d960'
+        }
+    });
+
+    map.addLayer({
+        id: 'unclustered-point',
+        type: 'circle',
+        source: 'bereal-src',
+        filter: ['!', ['has', 'point_count']],
+        paint: { 'circle-opacity': 0, 'circle-radius': 15 }
+    });
 }
 
 
@@ -181,9 +346,15 @@ function setupMapLayers(features) {
  * (Logique identique à la précédente, optimisée)
  */
 function openModal(photos) {
-    currentPhotos = photos; currentIndex = 0; updateModalContent();
+    currentPhotos = photos; 
+    currentIndex = 0; 
+    updateModalContent();
     modal.style.display = 'flex';
-    document.getElementById('map').style.cssText = 'transform: scale(1.1); filter: blur(10px) brightness(0.4);';
+    
+    // On floute la carte ET le badge
+    const blurEffect = 'scale(1.1); filter: blur(3px) brightness(0.4);';
+    document.getElementById('map').style.cssText = blurEffect;
+    document.querySelector('.user-profile-header').style.cssText += 'filter: blur(3px); pointer-events: none;';
 }
 
 function updateModalContent() {
@@ -201,7 +372,10 @@ function updateModalContent() {
 function closeModal() {
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
+    
+    // On retire le flou
     document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
+    document.querySelector('.user-profile-header').style.cssText = 'filter: none; pointer-events: auto;';
 }
 
 function nextPhoto() { if (currentIndex < currentPhotos.length - 1) { currentIndex++; vibrate('light'); updateModalContent(); } }
