@@ -75,6 +75,9 @@ function updateDashboardUI() {
     const countriesEl = document.getElementById('stat-countries');
     const depsEl = document.getElementById('stat-deps');
 
+    const maxStreakEl = document.getElementById('stat-max-streak');
+    if (maxStreakEl) maxStreakEl.innerText = cachedStats.maxStreak;
+
     // Mise à jour sécurisée des éléments restants
     if (streakEl) streakEl.innerText = cachedStats.total;
     if (ontimeEl) ontimeEl.innerText = `${cachedStats.percent}%`;
@@ -111,61 +114,78 @@ async function calculateStats() {
         const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
         const data = await memoriesRes.json();
 
-        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
-        const total = validMemories.length;
-        const onTimeCount = validMemories.filter(m => m.isLate === false).length;
-        const percentOnTime = total > 0 ? Math.round((onTimeCount / total) * 100) : 0;
+        // 1. CALCUL DE LA STREAK (Sur TOUS les BeReal, avec ou sans GPS)
+        const days = data
+            .filter(m => m.date)
+            .map(m => m.date.split('T')[0])
+            .sort();
 
-        const uniquePoints = [];
-        const seen = new Set();
+        const uniqueDays = [...new Set(days)];
+        
+        let maxStreak = 0;
+        let currentStreak = 0;
+        let streakStartDate = uniqueDays[0];
+
+        for (let i = 0; i < uniqueDays.length; i++) {
+            if (i === 0) {
+                currentStreak = 1;
+                streakStartDate = uniqueDays[i];
+            } else {
+                const prev = new Date(uniqueDays[i - 1]);
+                const curr = new Date(uniqueDays[i]);
+                const diffDays = Math.round((curr - prev) / (1000 * 60 * 60 * 24));
+
+                if (diffDays === 1) {
+                    currentStreak++;
+                } else {
+                    if (currentStreak > maxStreak) maxStreak = currentStreak;
+                    currentStreak = 1;
+                    streakStartDate = uniqueDays[i];
+                }
+            }
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
+        }
+
+        // 2. FILTRAGE POUR LA CARTE ET LA GÉO
+        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
+
+        // --- CALCUL GÉO (TURF) ---
+        const uniqueGeoPoints = [];
+        const seenGeo = new Set();
         validMemories.forEach(m => {
             const key = `${m.location.latitude.toFixed(3)},${m.location.longitude.toFixed(3)}`;
-            if (!seen.has(key)) {
-                seen.add(key);
-                uniquePoints.push([m.location.longitude, m.location.latitude]);
+            if (!seenGeo.has(key)) {
+                seenGeo.add(key);
+                uniqueGeoPoints.push([m.location.longitude, m.location.latitude]);
             }
         });
 
-        // Chargement des GeoJSON
         const [respWorld, respDeps] = await Promise.all([
             fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
             fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
         ]);
-        
         const worldGeo = await respWorld.json();
         const depsGeo = await respDeps.json();
-
         const foundCountries = new Set();
         const foundDeps = new Set();
 
-        uniquePoints.forEach(coords => {
+        uniqueGeoPoints.forEach(coords => {
             const pt = turf.point(coords);
-            for (let country of worldGeo.features) {
-                if (turf.booleanPointInPolygon(pt, country)) {
-                    foundCountries.add(country.properties.ADMIN || country.properties.name);
-                    break; 
-                }
-            }
-            if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 51) {
-                for (let dep of depsGeo.features) {
-                    if (turf.booleanPointInPolygon(pt, dep)) {
-                        foundDeps.add(dep.properties.nom);
-                        break;
-                    }
-                }
+            for (let c of worldGeo.features) { if (turf.booleanPointInPolygon(pt, c)) { foundCountries.add(c.properties.ADMIN || c.properties.name); break; } }
+            if (coords[0] > -5 && coords[0] < 10) {
+                for (let d of depsGeo.features) { if (turf.booleanPointInPolygon(pt, d)) { foundDeps.add(d.properties.nom); break; } }
             }
         });
 
-        // ON SAUVEGARDE DANS LE CACHE
+        // 3. MISE À JOUR CACHE & UI
         cachedStats = {
-            total: total,
-            percent: percentOnTime,
-            countries: foundCountries.size || (total > 0 ? 1 : 0),
-            deps: foundDeps.size
-            // On a viré la propriété "list" ici
+            total: data.length, // Affiche 1393 ici
+            percent: data.length > 0 ? Math.round((data.filter(m => !m.isLate).length / data.length) * 100) : 0,
+            countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0),
+            deps: foundDeps.size,
+            maxStreak: maxStreak
         };
 
-        // On met à jour l'UI tout de suite (au cas où le dashboard serait déjà ouvert)
         updateDashboardUI();
 
     } catch (e) {
@@ -435,8 +455,6 @@ function updateMapSource(features, radius) {
 
     // 5. On remet les couches (on appelle une petite fonction pour éviter de dupliquer le code)
     reAddLayers();
-
-    console.log("Source recréée avec rayon :", radius);
 }
 
 function reAddLayers() {

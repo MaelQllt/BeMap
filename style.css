@@ -322,3 +322,44 @@ body {
 .stat-card:hover .stat-label {
     color: #fff; /* Le label devient blanc aussi */
 }
+
+
+.streak-card {
+    background: #ffffff;
+    color: #000000;
+    padding: 20px 25px;
+    border-radius: 28px;
+    margin-top: 15px; /* Espace avec la grille du dessus */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: default;
+}
+
+.streak-card:hover {
+    transform: scale(1.02);
+}
+
+.streak-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.streak-value {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.streak-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-top: 5px;
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.streak-icon {
+    font-size: 40px;
+}
