@@ -10,6 +10,92 @@
  * 6. Initialisation
  */
 
+
+const DB_NAME = "BeRealMapDB";
+const STORE_NAME = "files";
+
+// À mettre juste après tes déclarations de variables globales
+document.getElementById('upload-overlay').style.display = 'flex';
+
+// Initialise la connexion à la base de données
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME);
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Sauvegarde un fichier dans la session
+async function saveFileToSession(path, file) {
+    const db = await openDB();
+    const buffer = await file.arrayBuffer(); // ← on stocke le buffer, pas le File
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        store.put({ buffer, type: file.type, name: file.name }, path);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject();
+    });
+}
+
+// Récupère tous les fichiers de la session
+async function loadSessionFiles() {
+    const db = await openDB();
+    return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, "readonly");
+        const store = tx.objectStore(STORE_NAME);
+        const keysRequest = store.getAllKeys();
+
+        keysRequest.onsuccess = () => {
+            const keys = keysRequest.result;
+            const valuesRequest = store.getAll();
+            
+            valuesRequest.onsuccess = () => {
+                const values = valuesRequest.result;
+                const results = {};
+                
+                for (let i = 0; i < keys.length; i++) {
+                    const data = values[i];
+                    if (data && data.buffer instanceof ArrayBuffer) {
+                        results[keys[i]] = new File([data.buffer], data.name || keys[i], { type: data.type || '' });
+                    }
+                }
+                
+                console.log("loadSessionFiles OK :", Object.keys(results).length, "fichiers");
+                console.log("user.json présent ?", !!results['user.json']);
+                resolve(results);
+            };
+            
+            valuesRequest.onerror = (e) => {
+                console.error("Erreur getAll :", e);
+                resolve({});
+            };
+        };
+        
+        keysRequest.onerror = (e) => {
+            console.error("Erreur getAllKeys :", e);
+            resolve({});
+        };
+    });
+}
+
+// Fonction pour se déconnecter
+async function clearSession() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readwrite");
+    tx.objectStore(STORE_NAME).clear();
+    tx.oncomplete = () => {
+        localStorage.removeItem('bereal_session_active');
+        location.reload();
+    };
+}
 // #region 1. CONFIGURATION & ÉTAT GLOBAL
 const FOLDER_NAME = "AF9TaX9kF2Ph70UyFt19wuMJvqr2-pGvnrPTVROrjNoqlXt1pl";
 
@@ -404,24 +490,34 @@ let fileMap = {}; // Index pour retrouver les fichiers par leur nom
 
 document.getElementById('folder-input').addEventListener('change', async (e) => {
     const files = e.target.files;
-    
-    // On indexe les fichiers (on retire le nom du dossier racine pour matcher le JSON)
+    const statusMsg = document.getElementById('status-msg');
+    statusMsg.innerText = "Création de la session... (0%)";
+
+    let count = 0;
     for (let file of files) {
         const path = file.webkitRelativePath.split('/').slice(1).join('/');
         fileMap[path] = file;
+        
+        // On sauvegarde chaque fichier dans IndexedDB
+        await saveFileToSession(path, file);
+        
+        count++;
+        if (count % 25 === 0) {
+            statusMsg.innerText = `Création de la session... (${Math.round((count/files.length)*100)}%)`;
+        }
     }
 
     try {
         const userData = JSON.parse(await fileMap['user.json'].text());
         const memoriesData = JSON.parse(await fileMap['memories.json'].text());
-
-        // On lance l'app avec les données
-        initApp(userData, memoriesData);
         
-        // On cache l'écran d'import
+        // On marque la session comme active dans le navigateur
+        localStorage.setItem('bereal_session_active', 'true');
+        
+        initApp(userData, memoriesData);
         document.getElementById('upload-overlay').style.display = 'none';
     } catch (err) {
-        alert("Dossier invalide. Assure-toi de choisir le dossier racine de l'archive.");
+        alert("Dossier invalide.");
     }
 });
 
@@ -483,13 +579,21 @@ async function initApp(userData, memoriesData) {
 
     // 3. Chargement de la Carte
     if (features.length > 0) {
+        // On crée une petite fonction interne pour être sûr de l'ordre
+        const injectFeatures = () => {
+            if (!map.getSource('bereal-src')) {
+                setupMapLayers(features);
+            }
+        };
+
         if (map.loaded()) {
-            setupMapLayers(features);
+            injectFeatures();
         } else {
-            map.on('load', () => setupMapLayers(features));
+            // On utilise 'load' ET 'style.load' pour être certain
+            map.once('load', injectFeatures);
         }
     } else {
-        console.warn("Aucune donnée de localisation trouvée dans l'archive.");
+        console.warn("Aucune donnée de localisation trouvée.");
     }
 
     // 4. Lancement des Statistiques (Pays, Départements, Streaks)
@@ -513,3 +617,40 @@ function prevPhoto() {
         updateModalContent();
     }
 }
+/**
+ * BLOC DE DÉMARRAGE UNIQUE (AUTO-LOGIN)
+ */
+async function handleAutoLogin() {
+    let keys = [];
+    try {
+        const savedFiles = await loadSessionFiles();
+        keys = Object.keys(savedFiles);
+
+        if (keys.length > 0 && savedFiles['user.json'] && savedFiles['memories.json']) {
+            fileMap = savedFiles;
+            document.getElementById('upload-overlay').style.display = 'none';
+
+            const decoder = new TextDecoder();
+            const userData = JSON.parse(decoder.decode(await savedFiles['user.json'].arrayBuffer()));
+            const memoriesData = JSON.parse(decoder.decode(await savedFiles['memories.json'].arrayBuffer()));
+
+            const launch = () => {
+                initApp(userData, memoriesData);
+                document.getElementById('loading-screen').style.display = 'none';
+            };
+
+            if (map.isStyleLoaded()) launch();
+            else map.once('style.load', launch);
+
+        } else {
+            document.getElementById('loading-screen').style.display = 'none';
+            document.getElementById('upload-overlay').style.display = 'flex';
+        }
+    } catch (err) {
+        console.error("Erreur critique:", err);
+        document.getElementById('loading-screen').style.display = 'none';
+        document.getElementById('upload-overlay').style.display = 'flex';
+    }
+}
+// On lance le processus
+handleAutoLogin();
