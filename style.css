@@ -497,3 +497,52 @@ body {
     75% { transform: scale(1.15) rotate(2deg); }
     100% { transform: scale(1) rotate(-5deg); }
 }
+
+
+/* --- OVERLAY D'UPLOAD --- */
+#upload-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #000;
+    z-index: 20000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.5s ease;
+}
+
+.upload-card {
+    text-align: center;
+    color: white;
+    font-family: 'Inter', sans-serif;
+}
+
+.upload-card h2 {
+    font-size: 48px;
+    letter-spacing: -2px;
+    margin-bottom: 10px;
+}
+
+#folder-input { display: none; }
+
+.upload-btn {
+    display: inline-block;
+    background: white;
+    color: black;
+    padding: 15px 30px;
+    border-radius: 30px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: transform 0.2s ease;
+}
+
+.upload-btn:hover {
+    transform: scale(1.05);
+}
+
+#status-msg {
+    margin-top: 15px;
+    font-size: 13px;
+    color: #ff4444;
+}

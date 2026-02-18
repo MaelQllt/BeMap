@@ -103,67 +103,77 @@ badge.addEventListener('click', () => {
 
 
 // #region 3. STATISTIQUES & DASHBOARD
-async function calculateStats() {
+async function calculateStats(data) {
     try {
-        const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
-        const data = await memoriesRes.json();
-
-        // --- 1. Streak ---
+        // 1. STREAK & TOTAL
         const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
         const uniqueDays = [...new Set(days)];
-        let maxStreak = 0, currentStreak = 0;
+        let maxStreak = 0, currentStr = 0;
         for (let i = 0; i < uniqueDays.length; i++) {
-            if (i === 0) currentStreak = 1;
+            if (i === 0) currentStr = 1;
             else {
-                const diffDays = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
-                if (diffDays === 1) currentStreak++;
-                else { maxStreak = Math.max(maxStreak, currentStreak); currentStreak = 1; }
+                const diff = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
+                if (diff === 1) currentStr++;
+                else { maxStreak = Math.max(maxStreak, currentStr); currentStr = 1; }
             }
-            maxStreak = Math.max(maxStreak, currentStreak);
+            maxStreak = Math.max(maxStreak, currentStr);
         }
 
-        // --- 2. Ponctualité ---
-        const momentsMap = {};
-        data.forEach(m => {
-            const momentId = m.berealMoment || m.date.split('T')[0];
-            if (!momentsMap[momentId]) momentsMap[momentId] = [];
-            momentsMap[momentId].push(m);
-        });
-
-        const momentIds = Object.keys(momentsMap);
-        let onTimeMomentsCount = 0;
+        // 2. PONCTUALITÉ
+        const momentIds = [...new Set(data.map(m => m.berealMoment || m.date.split('T')[0]))];
+        let onTimeCount = 0;
         momentIds.forEach(id => {
-            if (momentsMap[id].some(m => m.isLate === false)) onTimeMomentsCount++;
+            if (data.some(m => (m.berealMoment === id || m.date.split('T')[0] === id) && m.isLate === false)) onTimeCount++;
         });
-        const onTimePercent = momentIds.length > 0 ? Math.round((onTimeMomentsCount / momentIds.length) * 100) : 0;
+        const percent = momentIds.length > 0 ? Math.round((onTimeCount / momentIds.length) * 100) : 0;
 
-        // --- 3. Géographie (Turf.js) ---
+        // 3. GÉOGRAPHIE (PAYS & DEPS)
         const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
-        const uniqueGeoPoints = [];
-        const seenGeo = new Set();
-        validMemories.forEach(m => {
-            const key = `${m.location.latitude.toFixed(3)},${m.location.longitude.toFixed(3)}`;
-            if (!seenGeo.has(key)) { seenGeo.add(key); uniqueGeoPoints.push([m.location.longitude, m.location.latitude]); }
-        });
+        const uniqueGeoPoints = validMemories.map(m => [m.location.longitude, m.location.latitude]);
 
+        // On récupère les frontières pour le calcul
         const [respWorld, respDeps] = await Promise.all([
             fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
             fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
         ]);
-        const [worldGeo, depsGeo] = await Promise.all([respWorld.json(), respDeps.json()]);
+        const worldGeo = await respWorld.json();
+        const depsGeo = await respDeps.json();
         
-        const foundCountries = new Set(), foundDeps = new Set();
+        const foundCountries = new Set();
+        const foundDeps = new Set();
+
         uniqueGeoPoints.forEach(coords => {
             const pt = turf.point(coords);
-            for (let c of worldGeo.features) if (turf.booleanPointInPolygon(pt, c)) { foundCountries.add(c.properties.ADMIN || c.properties.name); break; }
-            if (coords[0] > -5 && coords[0] < 10) {
-                for (let d of depsGeo.features) if (turf.booleanPointInPolygon(pt, d)) { foundDeps.add(d.properties.nom); break; }
+            // Check Pays
+            for (let c of worldGeo.features) {
+                if (turf.booleanPointInPolygon(pt, c)) {
+                    foundCountries.add(c.properties.ADMIN || c.properties.name);
+                    break;
+                }
+            }
+            // Check Départements (si en France)
+            if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 52) {
+                for (let d of depsGeo.features) {
+                    if (turf.booleanPointInPolygon(pt, d)) {
+                        foundDeps.add(d.properties.nom);
+                        break;
+                    }
+                }
             }
         });
 
-        cachedStats = { total: data.length, percent: onTimePercent, countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0), deps: foundDeps.size, maxStreak };
+        cachedStats = { 
+            total: data.length, 
+            percent: percent, 
+            countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0), 
+            deps: foundDeps.size, 
+            maxStreak 
+        };
+        
         updateDashboardUI();
-    } catch (e) { console.error("Erreur Stats:", e); }
+    } catch (e) { 
+        console.error("Erreur calcul stats:", e); 
+    }
 }
 
 function updateDashboardUI() {
@@ -365,59 +375,141 @@ photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mi
 // #endregion
 
 
+function getLocalUrl(jsonPath) {
+    if (!jsonPath) return "";
+    
+    // 1. On enlève le premier slash s'il existe : "/Photos/..." -> "Photos/..."
+    let cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
+    
+    // 2. Parfois le JSON contient "Photos/AF9Ta.../post/img.webp" 
+    // Si c'est le cas, on doit garder uniquement "Photos/post/img.webp" ou "Photos/profile/img.webp"
+    if (cleanPath.includes('/post/')) {
+        const parts = cleanPath.split('/');
+        cleanPath = "Photos/post/" + parts[parts.length - 1];
+    } else if (cleanPath.includes('/profile/')) {
+        const parts = cleanPath.split('/');
+        cleanPath = "Photos/profile/" + parts[parts.length - 1];
+    }
+
+    const file = fileMap[cleanPath];
+    if (file) {
+        return URL.createObjectURL(file);
+    } else {
+        console.warn("Fichier non trouvé dans l'archive :", cleanPath);
+        return "";
+    }
+}
 // #region 6. INITIALISATION & ASSETS
-async function init() {
+let fileMap = {}; // Index pour retrouver les fichiers par leur nom
+
+document.getElementById('folder-input').addEventListener('change', async (e) => {
+    const files = e.target.files;
+    
+    // On indexe les fichiers (on retire le nom du dossier racine pour matcher le JSON)
+    for (let file of files) {
+        const path = file.webkitRelativePath.split('/').slice(1).join('/');
+        fileMap[path] = file;
+    }
+
     try {
-        const userRes = await fetch(`${FOLDER_NAME}/user.json`);
-        if (userRes.ok) {
-            const userData = await userRes.json();
-            const name = userData.username || "Utilisateur";
+        const userData = JSON.parse(await fileMap['user.json'].text());
+        const memoriesData = JSON.parse(await fileMap['memories.json'].text());
 
-            // Mise à jour du Header
-            const headerUser = document.getElementById('header-username');
-            if (headerUser) headerUser.innerText = name;
-
-            // Mise à jour de la Modale (BeReal utilise souvent une classe ici)
-            const modalUser = document.querySelector('.bereal-username');
-            if (modalUser) modalUser.innerText = name;
-
-            // Photo de profil
-            const profilePic = document.getElementById('profile-pic');
-            if (profilePic) profilePic.src = `${FOLDER_NAME}/Photos/profile/X9u-3RqfGd2xcaU0NYSDe.webp`;
-        }
-
-        const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
-        const data = await memoriesRes.json();
-        const momentCounts = {};
+        // On lance l'app avec les données
+        initApp(userData, memoriesData);
         
-        const features = data.map(m => {
-            const momentId = m.berealMoment || m.date.split('T')[0];
+        // On cache l'écran d'import
+        document.getElementById('upload-overlay').style.display = 'none';
+    } catch (err) {
+        alert("Dossier invalide. Assure-toi de choisir le dossier racine de l'archive.");
+    }
+});
+
+// Nouvelle fonction de démarrage
+async function initApp(userData, memoriesData) {
+    console.log("Démarrage de l'initialisation avec les données locales...");
+
+    // 1. Mise à jour du Profil (Textes et Image)
+    const name = userData.username || "Utilisateur";
+    
+    // Header (Badge)
+    const headerUser = document.getElementById('header-username');
+    if (headerUser) headerUser.innerText = name;
+
+    // Modal
+    const modalUser = document.querySelector('.bereal-username');
+    if (modalUser) modalUser.innerText = name;
+
+    // Photo de profil
+    if (userData.profilePicture) {
+        const picUrl = getLocalUrl(userData.profilePicture.path);
+        const profileImg = document.getElementById('profile-pic');
+        if (profileImg && picUrl) {
+            profileImg.src = picUrl;
+        }
+    }
+
+    // 2. Préparation des photos pour la carte (Features GeoJSON)
+    const momentCounts = {}; // Pour identifier le premier BeReal vs les Bonus
+
+    const features = memoriesData
+        .filter(m => m.location && m.location.longitude && m.location.latitude) // Évite le crash longitude
+        .map(m => {
+            // Logique pour déterminer si c'est un bonus
+            const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
             const isBonus = !!momentCounts[momentId];
             momentCounts[momentId] = true;
-            const hasLoc = m.location?.latitude && m.location?.longitude;
+
             return {
                 type: 'Feature',
-                geometry: { type: 'Point', coordinates: hasLoc ? [m.location.longitude, m.location.latitude] : [0, 0] },
+                geometry: { 
+                    type: 'Point', 
+                    coordinates: [m.location.longitude, m.location.latitude] 
+                },
                 properties: {
-                    caption: m.caption || (hasLoc ? "Sans légende" : "⚠️ Sans GPS"),
-                    front: `${FOLDER_NAME}/Photos/post/${m.frontImage.path.split('/').pop()}`,
-                    back: `${FOLDER_NAME}/Photos/post/${m.backImage.path.split('/').pop()}`,
+                    // On transforme les chemins du JSON en URLs locales (Blob)
+                    front: getLocalUrl(m.frontImage.path),
+                    back: getLocalUrl(m.backImage.path),
+                    caption: m.caption || "",
+                    // Formatage de la date et l'heure pour la France
                     date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
                     time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                    rawDate: m.takenTime, 
-                    isLate: m.isLate, 
-                    isBonus: isBonus
+                    rawDate: m.takenTime,
+                    isLate: m.isLate,
+                    isBonus: isBonus // Utilisé pour la bordure blanche (.on-time)
                 }
             };
         });
 
-        if (map.loaded()) setupMapLayers(features); else map.on('load', () => setupMapLayers(features));
-        calculateStats();
-    } catch (e) { 
-        console.error("Erreur init:", e); 
+    // 3. Chargement de la Carte
+    if (features.length > 0) {
+        if (map.loaded()) {
+            setupMapLayers(features);
+        } else {
+            map.on('load', () => setupMapLayers(features));
+        }
+    } else {
+        console.warn("Aucune donnée de localisation trouvée dans l'archive.");
+    }
+
+    // 4. Lancement des Statistiques (Pays, Départements, Streaks)
+    // On passe memoriesData en argument car calculateStats en a besoin
+    calculateStats(memoriesData);
+}
+
+// #endregion
+
+
+function nextPhoto() {
+    if (currentIndex < currentPhotos.length - 1) {
+        currentIndex++;
+        updateModalContent();
     }
 }
 
-
-init();
-// #endregion
+function prevPhoto() {
+    if (currentIndex > 0) {
+        currentIndex--;
+        updateModalContent();
+    }
+}
