@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -14,8 +15,11 @@
     
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
+
+    <!-- Badge de profil coin supérieur gauche -->
     <div class="user-profile-header">
         <div class="profile-pic-container">
             <img id="profile-pic" src="" alt="Profile">
@@ -23,8 +27,11 @@
         <span id="header-username"></span>
     </div>
 
+    <!-- Carte en arrière plan -->
     <div id="map"></div>
 
+
+    <!-- BeReal. -->
     <div id="bereal-modal" onclick="closeModal()">
         <div class="modal-content" onclick="event.stopPropagation()">
             <button id="prevBtn" class="nav-arrow prev" onclick="prevPhoto()">
@@ -41,7 +48,9 @@
                 </div>
                 <div class="bereal-logo-overlay">BeReal.</div>
             </div>
-            
+
+
+            <!-- Footer avec caption, date, heure, username-->
             <div class="bereal-footer">
                 <div id="modal-caption" class="bereal-caption"></div>
                 <div id="modal-metadata" class="bereal-metadata"></div>
@@ -50,6 +59,8 @@
         </div>
     </div>
 
+
+    <!-- Dashboard des stats, nombre de pays visités, départements, nombre de BeReals, % à l'heure, best streak-->
     <div id="dashboard-modal" class="modal-overlay" onclick="closeDashboard()">
         <div class="dashboard-content" onclick="event.stopPropagation()">
             <div class="dashboard-header">

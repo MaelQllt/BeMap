@@ -1,40 +1,53 @@
 /**
- * --- CONFIGURATION & ÉTAT GLOBAL ---
+ * BEREAL MAP CLONE - LOGIQUE GLOBALE
+ * -----------------------------------------
+ * Sommaire :
+ * 1. Config & État
+ * 2. Drag & Drop Badge (Profile)
+ * 3. Statistiques & Dashboard
+ * 4. Gestion de la Carte (MapLibre)
+ * 5. Fenêtre Modale & Interactions Photo
+ * 6. Initialisation
  */
+
+// #region 1. CONFIGURATION & ÉTAT GLOBAL
 const FOLDER_NAME = "AF9TaX9kF2Ph70UyFt19wuMJvqr2-pGvnrPTVROrjNoqlXt1pl";
 
+// Sélecteurs DOM
 const usernameDisplay = document.querySelector('.bereal-username');
 const miniBox = document.getElementById('mini-img-box');
 const container = document.getElementById('photo-container');
 const mainPhoto = document.getElementById('main-photo');
 const photoContainer = document.getElementById('photo-container');
 const modal = document.getElementById('bereal-modal');
+const badge = document.querySelector('.user-profile-header');
 
+// Variables d'état des photos
 let currentPhotos = [], currentIndex = 0, isFlipped = false;
 let isDragging = false, dragStartX, dragStartY, hasDragged = false, justFinishedDrag = false;
-let isZooming = false, zoomScale = 1, zoomOriginX = 50, zoomOriginY = 50;
-let translateX = 0, translateY = 0;
+
+// Variables de Zoom & Pan
+let isZooming = false, zoomScale = 1, translateX = 0, translateY = 0;
 let lastMouseX, lastMouseY;
+
+// Cache & Markers
 let cachedStats = null;
-
-// Stockage pour les chiffres Inter (HTML Markers)
 let clusterMarkers = {};
+// #endregion
 
-/**
- * --- DRAG PROFILE ---
- */
-const badge = document.querySelector('.user-profile-header');
+
+// #region 2. DRAG PROFILE BADGE (Effet Magnétique)
 let mouseX = 0, mouseY = 0; 
 let badgeX = 0, badgeY = 0; 
 let targetX = 0, targetY = 0; 
 let isDraggingBadge = false;
-
-// VARIABLES POUR DISTINGUER CLIC ET DRAG
 let hasMovedBadge = false; 
 let startX, startY; 
-
 const friction = 0.3; 
 
+/**
+ * Boucle d'animation pour l'inertie du badge
+ */
 function animateBadge() {
     badgeX += (targetX - badgeX) * friction;
     badgeY += (targetY - badgeY) * friction;
@@ -43,10 +56,10 @@ function animateBadge() {
 }
 animateBadge();
 
-// SOURIS (DESKTOP)
+// Événements Souris
 badge.addEventListener('mousedown', (e) => {
     isDraggingBadge = true;
-    hasMovedBadge = false; // On reset
+    hasMovedBadge = false;
     startX = e.clientX; 
     startY = e.clientY;
     mouseX = e.clientX;
@@ -54,25 +67,7 @@ badge.addEventListener('mousedown', (e) => {
     e.preventDefault();
 });
 
-document.addEventListener('mousemove', (e) => {
-    if (!isDraggingBadge) return;
-    
-    // Si on bouge de plus de 5 pixels, on considère que c'est un déplacement
-    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
-        hasMovedBadge = true;
-    }
-
-    targetX = e.clientX - mouseX;
-    targetY = e.clientY - mouseY;
-});
-
-document.addEventListener('mouseup', () => {
-    isDraggingBadge = false;
-    targetX = 0;
-    targetY = 0;
-});
-
-// TACTILE (MOBILE)
+// Événements Tactiles
 badge.addEventListener('touchstart', (e) => {
     isDraggingBadge = true;
     hasMovedBadge = false;
@@ -82,82 +77,38 @@ badge.addEventListener('touchstart', (e) => {
     mouseY = e.touches[0].clientY;
 }, {passive: false});
 
+document.addEventListener('mousemove', (e) => {
+    if (!isDraggingBadge) return;
+    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) hasMovedBadge = true;
+    targetX = e.clientX - mouseX;
+    targetY = e.clientY - mouseY;
+});
+
 document.addEventListener('touchmove', (e) => {
     if (!isDraggingBadge) return;
-    
-    if (Math.abs(e.touches[0].clientX - startX) > 5 || Math.abs(e.touches[0].clientY - startY) > 5) {
-        hasMovedBadge = true;
-    }
-
+    if (Math.abs(e.touches[0].clientX - startX) > 5 || Math.abs(e.touches[0].clientY - startY) > 5) hasMovedBadge = true;
     targetX = e.touches[0].clientX - mouseX;
     targetY = e.touches[0].clientY - mouseY;
     e.preventDefault();
 }, {passive: false});
 
-document.addEventListener('touchend', () => {
-    isDraggingBadge = false;
-    targetX = 0;
-    targetY = 0;
+const stopBadgeDrag = () => { isDraggingBadge = false; targetX = 0; targetY = 0; };
+document.addEventListener('mouseup', stopBadgeDrag);
+document.addEventListener('touchend', stopBadgeDrag);
+
+badge.addEventListener('click', () => {
+    if (!hasMovedBadge) openDashboard();
 });
-
-// LE CLIC (DÉCLENCHEUR DU DASHBOARD)
-badge.addEventListener('click', (e) => {
-    // Si hasMovedBadge est vrai, ça veut dire qu'on a fait un DRAG, donc on n'ouvre rien.
-    if (!hasMovedBadge) {
-        openDashboard();
-    }
-});
+// #endregion
 
 
-function updateDashboardUI() {
-    if (!cachedStats) return;
-
-    // On ne récupère que les compteurs de stats
-    const streakEl = document.getElementById('stat-streak');
-    const ontimeEl = document.getElementById('stat-ontime');
-    const countriesEl = document.getElementById('stat-countries');
-    const depsEl = document.getElementById('stat-deps');
-
-    const maxStreakEl = document.getElementById('stat-max-streak');
-    if (maxStreakEl) maxStreakEl.innerText = cachedStats.maxStreak;
-
-    // Mise à jour sécurisée des éléments restants
-    if (streakEl) streakEl.innerText = cachedStats.total;
-    if (ontimeEl) ontimeEl.innerText = `${cachedStats.percent}%`;
-    if (countriesEl) countriesEl.innerText = cachedStats.countries;
-    if (depsEl) depsEl.innerText = cachedStats.deps;
-}
-
-async function openDashboard() {
-    const dash = document.getElementById('dashboard-modal');
-    dash.style.display = 'flex';
-    
-    document.getElementById('map').style.cssText = 'transform: scale(1.05); filter: blur(3px) brightness(0.4);';
-    document.querySelector('.user-profile-header').style.opacity = '0';
-    document.querySelector('.user-profile-header').style.pointerEvents = 'none';
-    
-    // Si les stats sont prêtes, on les affiche. 
-    // Si elles ne sont pas encore prêtes (connexion lente), elles s'afficheront 
-    // automatiquement dès que calculateStats() aura fini grâce à updateDashboardUI()
-    if (cachedStats) {
-        updateDashboardUI();
-    }
-}
-
-function closeDashboard() {
-    document.getElementById('dashboard-modal').style.display = 'none';
-    document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
-    document.querySelector('.user-profile-header').style.opacity = '1';
-    document.querySelector('.user-profile-header').style.pointerEvents = 'auto';
-}
-
-
+// #region 3. STATISTIQUES & DASHBOARD
 async function calculateStats() {
     try {
         const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
         const data = await memoriesRes.json();
 
-        // --- 1. CALCUL DE LA STREAK ---
+        // --- 1. Streak ---
         const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
         const uniqueDays = [...new Set(days)];
         let maxStreak = 0, currentStreak = 0;
@@ -171,33 +122,23 @@ async function calculateStats() {
             maxStreak = Math.max(maxStreak, currentStreak);
         }
 
-        // --- 2. CALCUL DE LA PONCTUALITÉ (AVEC LOGS) ---
+        // --- 2. Ponctualité ---
         const momentsMap = {};
         data.forEach(m => {
-            // On utilise berealMoment (l'ID de l'alerte). S'il n'existe pas, on prend la date.
             const momentId = m.berealMoment || m.date.split('T')[0];
             if (!momentsMap[momentId]) momentsMap[momentId] = [];
             momentsMap[momentId].push(m);
         });
 
         const momentIds = Object.keys(momentsMap);
-        const totalMoments = momentIds.length;
         let onTimeMomentsCount = 0;
-
         momentIds.forEach(id => {
-            const photosDuMoment = momentsMap[id];
-            // Un moment est "On Time" si AU MOINS UNE photo n'est pas "late"
-            const isAnyOnTime = photosDuMoment.some(m => m.isLate === false);
-            
-            if (isAnyOnTime) {
-                onTimeMomentsCount++;
-            }
+            if (momentsMap[id].some(m => m.isLate === false)) onTimeMomentsCount++;
         });
+        const onTimePercent = momentIds.length > 0 ? Math.round((onTimeMomentsCount / momentIds.length) * 100) : 0;
 
-        const onTimePercent = totalMoments > 0 ? Math.round((onTimeMomentsCount / totalMoments) * 100) : 0;
-
-        // --- 3. GÉOGRAPHIE ---
-        const validMemories = data.filter(m => m.location && m.location.latitude && m.location.longitude);
+        // --- 3. Géographie (Turf.js) ---
+        const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
         const uniqueGeoPoints = [];
         const seenGeo = new Set();
         validMemories.forEach(m => {
@@ -209,73 +150,46 @@ async function calculateStats() {
             fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
             fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
         ]);
-        const worldGeo = await respWorld.json();
-        const depsGeo = await respDeps.json();
-        const foundCountries = new Set();
-        const foundDeps = new Set();
-
+        const [worldGeo, depsGeo] = await Promise.all([respWorld.json(), respDeps.json()]);
+        
+        const foundCountries = new Set(), foundDeps = new Set();
         uniqueGeoPoints.forEach(coords => {
             const pt = turf.point(coords);
-            for (let c of worldGeo.features) { if (turf.booleanPointInPolygon(pt, c)) { foundCountries.add(c.properties.ADMIN || c.properties.name); break; } }
+            for (let c of worldGeo.features) if (turf.booleanPointInPolygon(pt, c)) { foundCountries.add(c.properties.ADMIN || c.properties.name); break; }
             if (coords[0] > -5 && coords[0] < 10) {
-                for (let d of depsGeo.features) { if (turf.booleanPointInPolygon(pt, d)) { foundDeps.add(d.properties.nom); break; } }
+                for (let d of depsGeo.features) if (turf.booleanPointInPolygon(pt, d)) { foundDeps.add(d.properties.nom); break; }
             }
         });
 
-        // --- 4. MISE À JOUR ---
-        cachedStats = {
-            total: data.length,
-            percent: onTimePercent,
-            countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0),
-            deps: foundDeps.size,
-            maxStreak: maxStreak
-        };
-
+        cachedStats = { total: data.length, percent: onTimePercent, countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0), deps: foundDeps.size, maxStreak };
         updateDashboardUI();
-
-    } catch (e) {
-        console.error("Erreur Stats:", e);
-    }
+    } catch (e) { console.error("Erreur Stats:", e); }
 }
 
-document.addEventListener('mousemove', (e) => {
-    if (!isDraggingBadge) return;
-    
-    // On calcule la distance par rapport au point de départ du clic
-    targetX = e.clientX - mouseX;
-    targetY = e.clientY - mouseY;
-});
+function updateDashboardUI() {
+    if (!cachedStats) return;
+    const ids = { 'stat-streak': cachedStats.total, 'stat-ontime': `${cachedStats.percent}%`, 'stat-countries': cachedStats.countries, 'stat-deps': cachedStats.deps, 'stat-max-streak': cachedStats.maxStreak };
+    for (let id in ids) { const el = document.getElementById(id); if (el) el.innerText = ids[id]; }
+}
 
-document.addEventListener('mouseup', () => {
-    isDraggingBadge = false;
-    // L'aimant : on remet la cible à 0
-    targetX = 0;
-    targetY = 0;
-});
+function openDashboard() {
+    document.getElementById('dashboard-modal').style.display = 'flex';
+    document.getElementById('map').style.cssText = 'transform: scale(1.05); filter: blur(3px) brightness(0.4);';
+    badge.style.opacity = '0';
+    badge.style.pointerEvents = 'none';
+    if (cachedStats) updateDashboardUI();
+}
 
-// Support Tactile
-badge.addEventListener('touchstart', (e) => {
-    isDraggingBadge = true;
-    mouseX = e.touches[0].clientX;
-    mouseY = e.touches[0].clientY;
-}, {passive: false});
+function closeDashboard() {
+    document.getElementById('dashboard-modal').style.display = 'none';
+    document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
+    badge.style.opacity = '1';
+    badge.style.pointerEvents = 'auto';
+}
+// #endregion
 
-document.addEventListener('touchmove', (e) => {
-    if (!isDraggingBadge) return;
-    targetX = e.touches[0].clientX - mouseX;
-    targetY = e.touches[0].clientY - mouseY;
-    e.preventDefault();
-}, {passive: false});
 
-document.addEventListener('touchend', () => {
-    isDraggingBadge = false;
-    targetX = 0;
-    targetY = 0;
-});
-
-/**
- * --- INITIALISATION DE LA CARTE ---
- */
+// #region 4. GESTION DE LA CARTE (MapLibre)
 const map = new maplibregl.Map({
     container: 'map',
     style: 'https://api.maptiler.com/maps/dataviz-dark/style.json?key=iYlIQdqzuS2kKjZemTWi',
@@ -284,116 +198,20 @@ const map = new maplibregl.Map({
     maxZoom: 17
 });
 
-/**
- * --- LOGIQUE DE CHARGEMENT ---
- */
-async function init() {
-    try {
-        const userRes = await fetch(`${FOLDER_NAME}/user.json`);
-        if (userRes.ok) {
-            const userData = await userRes.json();
-            if (userData.username) {
-                document.getElementById('header-username').innerText = userData.username;
-                const modalUsername = document.querySelector('.bereal-username');
-                if (modalUsername) modalUsername.innerText = userData.username;
-            }
-            const profilePath = `${FOLDER_NAME}/Photos/profile/X9u-3RqfGd2xcaU0NYSDe.webp`;
-            document.getElementById('profile-pic').src = profilePath;
-        }
-
-        const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
-        if (!memoriesRes.ok) throw new Error("Fichier memories.json introuvable");
-        const data = await memoriesRes.json();
-
-        const momentCounts = {};
-        
-        // --- MODIFICATION ICI : On garde tout le monde ---
-        const features = data.map(m => {
-            const momentId = m.berealMoment || m.date.split('T')[0];
-            const isBonus = momentCounts[momentId] ? true : false;
-            momentCounts[momentId] = true;
-            const hasLocation = m.location && m.location.latitude && m.location.longitude;
-            const coords = hasLocation 
-                ? [parseFloat(m.location.longitude), parseFloat(m.location.latitude)] 
-                : [0, 0]; // Direction Null Island !
-
-            return {
-                type: 'Feature',
-                geometry: { 
-                    type: 'Point', 
-                    coordinates: coords 
-                },
-                properties: {
-                    caption: m.caption || (hasLocation ? "Sans légende" : "⚠️ Sans GPS - " + (m.caption || "")),
-                    front: `${FOLDER_NAME}/Photos/post/${m.frontImage.path.split('/').pop()}`,
-                    back: `${FOLDER_NAME}/Photos/post/${m.backImage.path.split('/').pop()}`,
-                    date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                    time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                    rawDate: m.takenTime,
-                    noGps: !hasLocation, // Petit flag pour savoir si c'est un point sans GPS
-                    isLate: m.isLate,
-                    isBonus: isBonus
-                }
-            };
-        });
-
-        if (map.loaded()) setupMapLayers(features);
-        else map.on('load', () => setupMapLayers(features));
-
-        calculateStats();
-
-    } catch (e) {
-        console.error("Erreur d'initialisation:", e);
-    }
-}
-
 function setupMapLayers(features) {
-    // 1. Sécurité : On vérifie si la source existe déjà pour éviter les erreurs de doublons
     if (map.getSource('bereal-src')) return;
 
-    // 2. Création de la source avec des paramètres statiques (indispensable pour la stabilité)
     map.addSource('bereal-src', {
         type: 'geojson',
-        data: { 
-            type: 'FeatureCollection', 
-            features: features 
-        },
+        data: { type: 'FeatureCollection', features },
         cluster: true,
-        // À partir du zoom 14, MapLibre ne cherchera plus à séparer les points
         clusterMaxZoom: 22, 
-        // Un rayon de 100px permet de garder les photos groupées même si elles sont un peu espacées
         clusterRadius: 50 
     });
 
-    // 3. Couche visuelle des Clusters (Cercles noirs)
-    map.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'bereal-src',
-        filter: ['has', 'point_count'],
-        paint: { 
-            'circle-color': '#151517', 
-            'circle-radius': 18, 
-            'circle-stroke-width': 1, 
-            'circle-stroke-color': '#d9d9d960'
-        }
-    });
+    reAddLayers();
 
-    // 4. Couche invisible pour les points isolés (pour laisser les Markers HTML s'afficher)
-    map.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: 'bereal-src',
-        filter: ['!', ['has', 'point_count']],
-        paint: { 
-            'circle-opacity': 0,
-            'circle-radius': 15 
-        }
-    });
-
-    /**
-     * --- LOGIQUE DES MARKERS HTML (Chiffres Inter et Points) ---
-     */
+    // Rendu des markers HTML personnalisés (Chiffres Inter)
     map.on('render', () => {
         const newMarkers = {};
         const featuresOnScreen = map.querySourceFeatures('bereal-src');
@@ -406,177 +224,66 @@ function setupMapLayers(features) {
 
             if (!clusterMarkers[id]) {
                 const el = document.createElement('div');
-                el.className = 'marker-anchor'; // C'est lui que MapLibre va déplacer
-
-                const inner = document.createElement('div'); // C'est lui qui va gonfler
-                if (props.cluster) {
-                    inner.className = 'custom-cluster-label';
-                    inner.innerText = props.point_count;
-                } else {
-                    inner.className = 'custom-point-marker';
-                }
+                el.className = 'marker-anchor';
+                const inner = document.createElement('div');
+                inner.className = props.cluster ? 'custom-cluster-label' : 'custom-point-marker';
+                if (props.cluster) inner.innerText = props.point_count;
                 
-                el.appendChild(inner); // On met le visuel dans l'ancre
-
-                clusterMarkers[id] = new maplibregl.Marker({
-                    element: el,
-                    anchor: 'center'
-                })
-                .setLngLat(coords)
-                .addTo(map);
+                el.appendChild(inner);
+                clusterMarkers[id] = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(coords).addTo(map);
             }
         }
-
-        // Nettoyage des markers qui sortent de l'écran
-        for (const id in clusterMarkers) {
-            if (!newMarkers[id]) {
-                clusterMarkers[id].remove();
-                delete clusterMarkers[id];
-            }
-        }
+        for (const id in clusterMarkers) if (!newMarkers[id]) { clusterMarkers[id].remove(); delete clusterMarkers[id]; }
     });
 
-    /**
-     * --- GESTION DES CLICS ---
-     */
+    // Clics
     map.on('click', 'clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
-        const clusterId = features[0].properties.cluster_id;
-        const coords = features[0].geometry.coordinates;
-        const source = map.getSource('bereal-src');
-
-        // CONDITION SPÉCIALE POUR NULL ISLAND [0, 0]
-        // Si on clique sur le point 0,0 (ou très proche), on ouvre direct
+        const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
+        const clusterId = f.properties.cluster_id;
+        const coords = f.geometry.coordinates;
         const isNullIsland = Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1;
 
         if (isNullIsland || map.getZoom() >= 13.5) {
-            source.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-                if (err) return;
-                // On trie par date pour avoir les plus récents en premier
-                openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
+            map.getSource('bereal-src').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+                if (!err) openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
             });
         } else {
-            // Sinon on zoom normalement pour disperser les vrais clusters géo
-            source.getClusterExpansionZoom(clusterId, (err, zoom) => {
-                if (err) return;
-                map.easeTo({ 
-                    center: coords, 
-                    zoom: Math.min(zoom, 14.5) 
-                });
+            map.getSource('bereal-src').getClusterExpansionZoom(clusterId, (err, zoom) => {
+                if (!err) map.easeTo({ center: coords, zoom: Math.min(zoom, 14.5) });
             });
         }
     });
 
-    // On n'oublie pas le clic sur un point isolé à 0,0 (si un seul BeReal n'a pas de GPS)
-    map.on('click', 'unclustered-point', (e) => {
-        openModal([e.features[0].properties]);
-    });
-
-    // Curseur pointer au survol
+    map.on('click', 'unclustered-point', (e) => openModal([e.features[0].properties]));
     map.on('mouseenter', 'clusters', () => map.getCanvas().style.cursor = 'pointer');
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
-
-    watchZoomRadius(features);
-}
-
-let currentRadiusMode = 50;
-
-function watchZoomRadius(features) {
-    map.on('zoom', () => {
-        const zoom = map.getZoom();
-        let newRadius = zoom >= 15 ? 80 : 50; 
-
-        if (newRadius !== currentRadiusMode) {
-            currentRadiusMode = newRadius;
-            updateMapSource(features, newRadius);
-        }
-    });
-}
-
-function updateMapSource(features, radius) {
-    if (!map.getSource('bereal-src')) return;
-
-    // 1. On récupère les définitions des couches avant de supprimer la source
-    // car supprimer une source supprime automatiquement ses couches liées.
-    
-    // 2. On supprime les couches
-    if (map.getLayer('clusters')) map.removeLayer('clusters');
-    if (map.getLayer('unclustered-point')) map.removeLayer('unclustered-point');
-
-    // 3. On supprime la source
-    map.removeSource('bereal-src');
-
-    // 4. On recrée la source AVEC LE NOUVEAU RAYON
-    map.addSource('bereal-src', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: features },
-        cluster: true,
-        clusterMaxZoom: 20,
-        clusterRadius: radius
-    });
-
-    // 5. On remet les couches (on appelle une petite fonction pour éviter de dupliquer le code)
-    reAddLayers();
 }
 
 function reAddLayers() {
-    map.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'bereal-src',
-        filter: ['has', 'point_count'],
-        paint: { 
-            'circle-color': '#151517', 
-            'circle-radius': 18, 
-            'circle-stroke-width': 1, 
-            'circle-stroke-color': '#d9d9d960'
-        }
-    });
-
-    map.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: 'bereal-src',
-        filter: ['!', ['has', 'point_count']],
-        paint: { 'circle-opacity': 0, 'circle-radius': 15 }
-    });
+    map.addLayer({ id: 'clusters', type: 'circle', source: 'bereal-src', filter: ['has', 'point_count'], paint: { 'circle-color': '#151517', 'circle-radius': 18, 'circle-stroke-width': 1, 'circle-stroke-color': '#d9d9d960' } });
+    map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-opacity': 0, 'circle-radius': 15 } });
 }
+// #endregion
 
 
-/**
- * --- MODAL, ZOOM, DRAG ---
- * (Logique identique à la précédente, optimisée)
- */
+// #region 5. MODALE, FLIP, ZOOM & PAN
 function openModal(photos) {
-    currentPhotos = photos; 
-    currentIndex = 0; 
+    currentPhotos = photos; currentIndex = 0; 
     updateModalContent();
     modal.style.display = 'flex';
-    
-    // On floute la carte ET le badge
-    const blurEffect = 'scale(1.1); filter: blur(3px) brightness(0.4);';
-    document.getElementById('map').style.cssText = blurEffect;
-    document.querySelector('.user-profile-header').style.cssText += 'filter: blur(3px); pointer-events: none;';
+    document.getElementById('map').style.cssText = 'scale(1.1); filter: blur(3px) brightness(0.4);';
+    badge.style.cssText += 'filter: blur(3px); pointer-events: none;';
 }
 
 function updateModalContent() {
     const p = currentPhotos[currentIndex];
-    isFlipped = false; 
-    resetZoomState();
-    
+    isFlipped = false; resetZoomState();
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption;
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
     
-    // --- GESTION DE LA BORDURE DYNAMIQUE ---
-    if (p.isLate === false && p.isBonus === false) {
-        container.classList.add('on-time');
-    } else {
-        container.classList.remove('on-time');
-    }
-    // ---------------------------------------
-
+    container.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
     miniBox.style.cssText = 'transition: none; left: 14px; top: 14px;';
     document.getElementById('prevBtn').style.display = (currentPhotos.length > 1 && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (currentPhotos.length > 1 && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
@@ -585,22 +292,16 @@ function updateModalContent() {
 function closeModal() {
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
-    
-    // On retire le flou
     document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
-    document.querySelector('.user-profile-header').style.cssText = 'filter: none; pointer-events: auto;';
+    badge.style.cssText = 'filter: none; pointer-events: auto;';
 }
 
-function nextPhoto() { if (currentIndex < currentPhotos.length - 1) { currentIndex++; vibrate('light'); updateModalContent(); } }
-function prevPhoto() { if (currentIndex > 0) { currentIndex--; vibrate('light'); updateModalContent(); } }
-
-function vibrate(type) { if (navigator.vibrate) navigator.vibrate(type === 'light' ? 10 : 20); }
-
-// Logic Drag, Flip et Zoom (simplifiée pour le message)
+// --- LOGIQUE PHOTO (DRAG & FLIP) ---
 miniBox.addEventListener('mousedown', (e) => {
     isDragging = true; hasDragged = false;
-    dragStartX = e.clientX - miniBox.offsetLeft;
-    dragStartY = e.clientY - miniBox.offsetTop;
+    const rect = miniBox.getBoundingClientRect(), cRect = container.getBoundingClientRect();
+    dragStartX = e.clientX - (rect.left - cRect.left);
+    dragStartY = e.clientY - (rect.top - cRect.top);
     miniBox.style.transition = 'none';
     e.preventDefault(); e.stopPropagation();
 });
@@ -608,104 +309,115 @@ miniBox.addEventListener('mousedown', (e) => {
 document.addEventListener('mousemove', (e) => {
     if (isDragging) {
         hasDragged = true;
-        miniBox.style.left = Math.max(10, Math.min(e.clientX - dragStartX, container.offsetWidth - miniBox.offsetWidth - 10)) + 'px';
-        miniBox.style.top = Math.max(10, Math.min(e.clientY - dragStartY, container.offsetHeight - miniBox.offsetHeight - 10)) + 'px';
+        const clampedX = Math.max(10, Math.min(e.clientX - dragStartX, container.offsetWidth - miniBox.offsetWidth - 10));
+        const clampedY = Math.max(10, Math.min(e.clientY - dragStartY, container.offsetHeight - miniBox.offsetHeight - 10));
+        miniBox.style.transform = `translate(${clampedX - 14}px, ${clampedY - 14}px)`;
     }
     if (isZooming) handlePan(e.clientX, e.clientY);
 });
 
-document.addEventListener('mouseup', (e) => {
+document.addEventListener('mouseup', () => {
     if (isDragging) {
         isDragging = false;
         if (!hasDragged) {
-            isFlipped = !isFlipped; vibrate('light');
+            isFlipped = !isFlipped;
             const p = currentPhotos[currentIndex];
             mainPhoto.src = isFlipped ? p.front : p.back;
             document.getElementById('mini-photo').src = isFlipped ? p.back : p.front;
         } else {
-            justFinishedDrag = true; vibrate('medium');
+            justFinishedDrag = true;
             miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            miniBox.style.left = (miniBox.offsetLeft + miniBox.offsetWidth/2) < container.offsetWidth/2 ? '14px' : (container.offsetWidth - miniBox.offsetWidth - 14) + 'px';
-            miniBox.style.top = '14px';
+            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (container.getBoundingClientRect().left + container.offsetWidth/2);
+            miniBox.style.transform = snapRight ? `translate(${container.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
             setTimeout(() => justFinishedDrag = false, 500);
         }
     }
     if (isZooming) { justFinishedDrag = true; resetZoomState(); setTimeout(() => justFinishedDrag = false, 300); }
 });
 
+// --- LOGIQUE ZOOM ---
 function updateTransform() {
-    // 1. Calcul de la zone visible supplémentaire créée par le zoom
-    // (Largeur zoomée - Largeur conteneur) / 2
-    const maxTx = (container.offsetWidth * (zoomScale - 1)) / 2;
-    const maxTy = (container.offsetHeight * (zoomScale - 1)) / 2;
-
-    // 2. On bloque (clamp) les valeurs pour ne jamais dépasser ces bords
-    // On divise par zoomScale car le translate est multiplié par le scale en CSS
-    const clampX = maxTx / zoomScale;
-    const clampY = maxTy / zoomScale;
-
-    translateX = Math.max(-clampX, Math.min(translateX, clampX));
-    translateY = Math.max(-clampY, Math.min(translateY, clampY));
-
-    // 3. On applique la transformation
+    const maxTx = (container.offsetWidth * (zoomScale - 1)) / 2, maxTy = (container.offsetHeight * (zoomScale - 1)) / 2;
+    translateX = Math.max(-maxTx/zoomScale, Math.min(translateX, maxTx/zoomScale));
+    translateY = Math.max(-maxTy/zoomScale, Math.min(translateY, maxTy/zoomScale));
     mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
 }
 
 function resetZoomState() { isZooming = false; zoomScale = 1; translateX = 0; translateY = 0; mainPhoto.style.transform = 'scale(1) translate(0,0)'; photoContainer.classList.remove('zoomed'); }
+
 function startZoom(x, y) {
-    if (isZooming) return;
-    isZooming = true;
-    
-    // On fixe l'origine au centre pour éviter les décalages imprévisibles
-    mainPhoto.style.transformOrigin = `50% 50%`;
-    
-    lastMouseX = x;
-    lastMouseY = y;
-    
-    // Position initiale : pas de décalage
-    translateX = 0;
-    translateY = 0;
-    
-    zoomScale = 2.5; 
+    isZooming = true; mainPhoto.style.transformOrigin = `50% 50%`;
+    lastMouseX = x; lastMouseY = y; translateX = 0; translateY = 0; zoomScale = 2.5; 
     mainPhoto.style.transition = 'transform 0.25s ease-out';
-    
     updateTransform();
     photoContainer.classList.add('zoomed');
 }
+
 function handlePan(x, y) {
-    // On calcule le mouvement relatif
-    const deltaX = (x - lastMouseX) / zoomScale;
-    const deltaY = (y - lastMouseY) / zoomScale;
-
-    translateX += deltaX;
-    translateY += deltaY;
-
-    lastMouseX = x;
-    lastMouseY = y;
-
-    mainPhoto.style.transition = 'none'; // Pas de délai pendant le mouvement
+    translateX += (x - lastMouseX) / zoomScale;
+    translateY += (y - lastMouseY) / zoomScale;
+    lastMouseX = x; lastMouseY = y;
+    mainPhoto.style.transition = 'none';
     updateTransform();
 }
+
 photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mini-img-container')) startZoom(e.clientX, e.clientY); });
+// #endregion
 
 
-// --- ANIMATION FLAMME EMBARQUÉE ---
-const flameContainer = document.getElementById('lottie-container');
+// #region 6. INITIALISATION & ASSETS
+async function init() {
+    try {
+        const userRes = await fetch(`${FOLDER_NAME}/user.json`);
+        if (userRes.ok) {
+            const userData = await userRes.json();
+            const name = userData.username || "Utilisateur";
 
-// On définit l'animation directement en JSON (version allégée)
-const flameData = {"v":"5.5.7","fr":30,"ip":0,"op":60,"w":50,"h":50,"nm":"Flame","ddd":0,"assets":[],"layers":[{"ddd":0,"ind":1,"ty":4,"nm":"Flame","sr":1,"ks":{"o":{"a":0,"k":100,"ix":11},"r":{"a":0,"k":0,"ix":10},"p":{"a":0,"k":[25,25,0],"ix":2},"a":{"a":0,"k":[0,0,0],"ix":1},"s":{"a":1,"k":[{"i":{"x":[0.667,0.667,0.667],"y":[1,1,1]},"o":{"x":[0.333,0.333,0.333],"y":[0,0,0]},"t":0,"s":[100,100,100]},{"i":{"x":[0.667,0.667,0.667],"y":[1,1,1]},"o":{"x":[0.333,0.333,0.333],"y":[0,0,0]},"t":30,"s":[105,115,100]},{"t":60,"s":[100,100,100]}],"ix":6}},"ao":0,"shapes":[{"ty":"gr","it":[{"d":1,"ty":"el","s":{"a":0,"k":[30,40],"ix":2},"p":{"a":0,"k":[0,0],"ix":3},"nm":"Circle Path","mn":"ADBE Vector Shape - Ellipse","hd":false},{"ty":"fl","c":{"a":0,"k":[1,0.5,0,1],"ix":4},"o":{"a":0,"k":100,"ix":5},"r":1,"bm":0,"nm":"Fill 1","mn":"ADBE Vector Graphic - Fill","hd":false},{"ty":"tr","p":{"a":0,"k":[0,5],"ix":2},"a":{"a":0,"k":[0,0],"ix":1},"s":{"a":0,"k":[100,100],"ix":3},"r":{"a":1,"k":[{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":0,"s":[-2]},{"i":{"x":[0.667],"y":[1]},"o":{"x":[0.333],"y":[0]},"t":30,"s":[2]},{"t":60,"s":[-2]}],"ix":6},"o":{"a":0,"k":100,"ix":7},"sk":{"a":0,"k":0,"ix":4},"sa":{"a":0,"k":0,"ix":5},"nm":"Transform"}],"nm":"Flame Shape","np":3,"cix":2,"bm":0,"ix":1,"mn":"ADBE Vector Group","hd":false}],"ip":0,"op":60,"st":0,"bm":0}]}
+            // Mise à jour du Header
+            const headerUser = document.getElementById('header-username');
+            if (headerUser) headerUser.innerText = name;
 
-if (flameContainer) {
-    const animation = lottie.loadAnimation({
-        container: flameContainer,
-        renderer: 'svg',
-        loop: true,
-        autoplay: false,
-        animationData: flameData // ON UTILISE LES DATA DIRECTEMENT, PLUS DE FICHIER EXTERNE !
-    });
+            // Mise à jour de la Modale (BeReal utilise souvent une classe ici)
+            const modalUser = document.querySelector('.bereal-username');
+            if (modalUser) modalUser.innerText = name;
 
-    flameContainer.addEventListener('mouseenter', () => animation.play());
-    flameContainer.addEventListener('mouseleave', () => animation.stop());
+            // Photo de profil
+            const profilePic = document.getElementById('profile-pic');
+            if (profilePic) profilePic.src = `${FOLDER_NAME}/Photos/profile/X9u-3RqfGd2xcaU0NYSDe.webp`;
+        }
+
+        const memoriesRes = await fetch(`${FOLDER_NAME}/memories.json`);
+        const data = await memoriesRes.json();
+        const momentCounts = {};
+        
+        const features = data.map(m => {
+            const momentId = m.berealMoment || m.date.split('T')[0];
+            const isBonus = !!momentCounts[momentId];
+            momentCounts[momentId] = true;
+            const hasLoc = m.location?.latitude && m.location?.longitude;
+            return {
+                type: 'Feature',
+                geometry: { type: 'Point', coordinates: hasLoc ? [m.location.longitude, m.location.latitude] : [0, 0] },
+                properties: {
+                    caption: m.caption || (hasLoc ? "Sans légende" : "⚠️ Sans GPS"),
+                    front: `${FOLDER_NAME}/Photos/post/${m.frontImage.path.split('/').pop()}`,
+                    back: `${FOLDER_NAME}/Photos/post/${m.backImage.path.split('/').pop()}`,
+                    date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                    time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                    rawDate: m.takenTime, 
+                    isLate: m.isLate, 
+                    isBonus: isBonus
+                }
+            };
+        });
+
+        if (map.loaded()) setupMapLayers(features); else map.on('load', () => setupMapLayers(features));
+        calculateStats();
+    } catch (e) { 
+        console.error("Erreur init:", e); 
+    }
 }
 
+
 init();
+// #endregion

@@ -31,6 +31,7 @@ body {
     width: 90%; max-width: 420px; 
     position: relative; display: flex; flex-direction: column; align-items: center; 
     animation: modalScale 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+    isolation: isolate; /* ← AJOUTE ÇA */
 }
 
 @keyframes modalScale {
@@ -43,12 +44,12 @@ body {
     position: relative; width: 100%; aspect-ratio: 3/4;
     border-radius: 24px; overflow: hidden; background: var(--card-bg);
     box-shadow: 0 40px 100px rgba(0,0,0,0.9);
-    /* Bordure par défaut (Late ou standard) */
     border: 1.5px solid rgba(255,255,255,0.2); 
     cursor: zoom-in; touch-action: none;
-    mask-image: radial-gradient(white, black);
-    -webkit-mask-image: -webkit-radial-gradient(white, black);
-    transition: border 0.3s ease, box-shadow 0.3s ease; /* Pour une transition douce */
+    /* Supprime les deux lignes mask-image */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0); /* Force un layer de compositing propre sur Safari */
+    transition: border 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* --- ÉTAT ON-TIME (Bordure blanche épaisse) --- */
@@ -61,6 +62,7 @@ body {
     width: 100% !important; height: 100% !important; 
     object-fit: cover; position: absolute; top: 0; left: 0;
     transform: translateZ(0); -webkit-transform: translateZ(0);
+    -webkit-user-drag: none;
     pointer-events: none;
 }
 
@@ -69,6 +71,9 @@ body {
     border-radius: 14px; z-index: 10; border: 2px solid #000; 
     overflow: hidden; cursor: grab; box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     transition: opacity 0.3s ease, transform 0.3s ease;
+    will-change: left, top;                    /* ← AJOUTE ÇA */
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);   
 }
 
 /* --- ÉTATS ZOOM --- */
@@ -76,7 +81,8 @@ body {
 .bereal-container.zoomed .mini-img-container { opacity: 0; transform: scale(0.85); pointer-events: none; }
 
 /* --- TEXTES & FOOTER --- */
-.bereal-footer { width: 100%; text-align: center; color: white; padding-top: 10px; pointer-events: none; }
+.bereal-footer { width: 100%; text-align: center; color: white; padding-top: 10px; pointer-events: none; position: relative; /* ← nécessaire pour que z-index fonctionne */
+    z-index: 10;        /* ← AJOUTE ÇA */ }
 .bereal-caption { font-size: 12px; font-weight: 400; margin-bottom: 4px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
 .bereal-metadata { font-size: 9px; color: var(--text-secondary); font-weight: 300; margin-bottom: 12px; }
 .bereal-username { font-size: 35px; font-weight: 700; text-transform: uppercase; line-height: 0.9; }
