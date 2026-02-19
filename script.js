@@ -963,6 +963,16 @@ function fullResize() {
     }
 }
 
+function handleLogout(event) {
+    event.stopPropagation(); // Empêche la fermeture accidentelle de la modale
+    
+    if (confirm("Voulez-vous vraiment vous déconnecter et supprimer les données locales ?")) {
+        localStorage.clear(); // Efface les stats et préférences
+        // Si tu utilises IndexedDB pour les photos, il faudrait aussi vider la DB ici
+        window.location.reload(); // Recharge pour revenir à l'écran d'upload
+    }
+}
+
 window.addEventListener('resize', fullResize);
 
 // On garde tes délais, ils sont parfaits pour le comportement asynchrone d'iOS

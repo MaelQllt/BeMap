@@ -35,7 +35,7 @@
 
     <div id="upload-overlay" style="display:none;">
         <div class="upload-card">
-            <h2>BeReal. <span style="font-weight: 100;">ESSAI</span></h2>
+            <h2>BeReal. <span style="font-weight: 100;">Map</span></h2>
             <p>Sélectionnez votre dossier d'archive dézippé</p>
             <label for="folder-input" class="upload-btn">Choisir le dossier</label>
             <input type="file" id="folder-input" webkitdirectory directory multiple>
@@ -82,6 +82,11 @@
                 <div id="modal-caption" class="bereal-caption"></div>
                 <div id="modal-metadata" class="bereal-metadata"></div>
                 <div class="bereal-username">Chargement...</div>
+            </div>
+        </div>
+        <div class="logout-wrapper" onclick="handleLogout(event)">
+            <div class="logout-card-minimal">
+                <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
             </div>
         </div>
     </div>
