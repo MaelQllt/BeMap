@@ -599,7 +599,7 @@ body {
 #status-msg {
     margin-top: 15px;
     font-size: 13px;
-    color: #ff4444;
+    color: #fb3c30;
 }
 
 /* --- BOUTON DÉCONNEXION MINIMALISTE (HORS MODAL) --- */
@@ -635,7 +635,7 @@ body {
 
 /* On applique aussi les changements de texte via le wrapper */
 .logout-wrapper:hover .logout-label-minimal {
-    color: #ff6666;
+    color: #fb3c30;
     font-weight: 400;
     transform: scale(1.02);
 }

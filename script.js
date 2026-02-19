@@ -686,17 +686,22 @@ function resetZoomState() { isZooming = false; zoomScale = 1; translateX = 0; tr
 
 function startZoom(x, y) {
     isZooming = true; mainPhoto.style.transformOrigin = `50% 50%`;
-    lastMouseX = x; lastMouseY = y; translateX = 0; translateY = 0; zoomScale = 2.5; 
+    lastMouseX = x; lastMouseY = y; translateX = 0; translateY = 0; zoomScale = 1.6; 
     mainPhoto.style.transition = 'transform 0.25s ease-out';
     updateTransform();
     photoContainer.classList.add('zoomed');
 }
 
 function handlePan(x, y) {
-    translateX += (x - lastMouseX) / zoomScale;
+    // On divise par le zoomScale pour que le mouvement de l'image 
+    // corresponde à la distance parcourue par la souris
+    translateX += (x - lastMouseX) / zoomScale;426197
     translateY += (y - lastMouseY) / zoomScale;
-    lastMouseX = x; lastMouseY = y;
-    mainPhoto.style.transition = 'none';
+    
+    lastMouseX = x; 
+    lastMouseY = y;
+    
+    mainPhoto.style.transition = 'none'; // Pas de transition pendant le glissement
     updateTransform();
 }
 
@@ -963,13 +968,35 @@ function fullResize() {
     }
 }
 
-function handleLogout(event) {
-    event.stopPropagation(); // Empêche la fermeture accidentelle de la modale
+async function handleLogout(event) {
+    if (event) event.stopPropagation(); // Empêche la fermeture de la modale
     
     if (confirm("Voulez-vous vraiment vous déconnecter et supprimer les données locales ?")) {
-        localStorage.clear(); // Efface les stats et préférences
-        // Si tu utilises IndexedDB pour les photos, il faudrait aussi vider la DB ici
-        window.location.reload(); // Recharge pour revenir à l'écran d'upload
+        try {
+            // 1. On vide la base de données IndexedDB (fichiers photos/JSON)
+            const db = await openDB();
+            const tx = db.transaction(STORE_NAME, "readwrite");
+            tx.objectStore(STORE_NAME).clear();
+            
+            tx.oncomplete = () => {
+                // 2. On vide le localStorage (marqueur de session)
+                localStorage.clear();
+                
+                // 3. On recharge la page pour revenir à l'écran d'upload
+                window.location.reload();
+            };
+
+            tx.onerror = (e) => {
+                console.error("Erreur lors de la suppression des données:", e);
+                // Fail-safe : on tente quand même le reload
+                localStorage.clear();
+                window.location.reload();
+            };
+        } catch (err) {
+            console.error("Erreur déconnexion:", err);
+            localStorage.clear();
+            window.location.reload();
+        }
     }
 }
 
