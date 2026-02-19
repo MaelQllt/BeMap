@@ -689,41 +689,64 @@ body {
 .next-dash { right: -60px; }
 
 
-/* --- RESPONSIVE DASHBOARD --- */
 @media (max-width: 600px) {
+    /* On réduit la taille globale du Dashboard */
     .dashboard-content {
-        width: 85%;
-        padding: 20px;
-        border-radius: 28px;
+        width: 90%;
+        padding: 15px;
+        border-radius: 24px;
+    }
+
+    .dashboard-header {
+        margin-bottom: 15px;
     }
 
     .dashboard-title {
-        font-size: 22px;
+        font-size: 20px;
+        margin-top: 0;
+    }
+
+    /* On réduit les cartes de stats pour gagner de la place */
+    .stat-card {
+        padding: 10px 5px;
+        border-radius: 18px;
     }
 
     .stat-value {
-        font-size: 28px; /* Plus petit pour éviter les retours à la ligne */
+        font-size: 24px !important;
     }
 
-    .stat-card {
-        padding: 15px 10px;
+    .stat-label {
+        font-size: 8px;
+    }
+
+    .streak-card {
+        height: 70px;
+        padding: 0 15px;
     }
 
     .streak-value {
-        font-size: 32px;
+        font-size: 26px !important;
     }
 
-    /* Repositionnement des flèches à l'intérieur sur Mobile */
-    .prev-dash { left: 10px; background: rgba(0,0,0,0.5); }
-    .next-dash { right: 10px; background: rgba(0,0,0,0.5); }
-    
+    /* Flèches du Dashboard : on les rend plus petites pour ne pas gêner */
     .dash-nav {
-        width: 38px;
-        height: 38px;
-        top: 40%; /* Un peu plus haut pour ne pas gêner les pouces */
+        width: 35px;
+        height: 35px;
+        background: rgba(255, 255, 255, 0.1);
+        top: 45%;
+    }
+    .prev-dash { left: -15px; } /* Légèrement décalées vers l'extérieur */
+    .next-dash { right: -15px; }
+
+    /* Bouton Logout : On le rend plus compact */
+    .logout-wrapper {
+        margin-top: 15px;
+    }
+    .logout-card-minimal {
+        padding: 6px 12px;
     }
 }
-
 /* --- RESPONSIVE MODAL PHOTO --- */
 @media (max-width: 600px) {
     .modal-content {
@@ -763,5 +786,28 @@ body {
 
     #header-username {
         font-size: 12px;
+    }
+}
+
+
+@media (max-width: 600px) {
+    /* On réaffiche les flèches mais à l'intérieur de l'image */
+    .nav-arrow {
+        display: flex !important;
+        position: absolute;
+        width: 40px;
+        height: 40px;
+        background: rgba(0, 0, 0, 0.3); /* Fond sombre pour contraste */
+        backdrop-filter: blur(5px);
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1000;
+    }
+
+    .prev { left: 10px !important; } /* À l'intérieur à gauche */
+    .next { right: 10px !important; } /* À l'intérieur à droite */
+
+    .modal-content {
+        max-width: 100%;
     }
 }
