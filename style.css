@@ -11,6 +11,10 @@ body {
     font-family: 'Inter', sans-serif; 
     background: var(--bg-color); 
     overflow: hidden;
+    height: 100vh;
+    /* Utilise la zone sécurisée pour éviter que le profil soit SOUS l'heure */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* --- CARTE --- */
@@ -214,7 +218,7 @@ body {
 /* --- BADGE PROFIL HAUT GAUCHE --- */
 .user-profile-header {
     position: fixed;
-    top: 25px;
+    top: calc(15px + env(safe-area-inset-top));
     left: 25px;
     z-index: 1000;
     display: flex;
@@ -385,6 +389,7 @@ body {
     margin-bottom: 0; /* On gère le margin via le gap global si besoin */
 }
 
+/* --- HARMONISATION DES CARTES --- */
 .stat-card {
     background: #ffffff14;
     padding: 24px 15px; 
@@ -392,11 +397,29 @@ body {
     display: flex; 
     flex-direction: column; 
     align-items: center;
+    justify-content: center; /* Centre verticalement le contenu */
     border: 1px solid transparent;
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     cursor: default;
+    
+    /* Force une hauteur minimale identique pour toutes les petites cartes */
+    min-height: 120px; 
+    box-sizing: border-box;
 }
 
+/* --- AJUSTEMENT DES VALEURS --- */
+.stat-value { 
+    font-size: 32px; /* Réduit de 38px à 32px pour laisser respirer */
+    font-weight: 900; 
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+    display: inline-block;
+    color: var(--text-secondary);
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;      /* Empêche le retour à la ligne */
+    overflow: hidden;         /* Coupe si c'est vraiment trop long */
+    text-overflow: ellipsis;  /* Ajoute "..." si c'est coupé */
+}
 
 
 /* --- INTERACTION CARTE --- */
