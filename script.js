@@ -973,37 +973,34 @@ function handleLogout(event) {
     }
 }
 
-window.addEventListener('resize', fullResize);
-
-// On garde tes délais, ils sont parfaits pour le comportement asynchrone d'iOS
-[100, 300, 500, 1000, 2000].forEach(delay => {
-    setTimeout(fullResize, delay);
-});
-
-// --- FIX FINAL POUR LA BANDE ROUGE PWA ---
+/* --- GESTION DE LA TAILLE ÉCRAN (FIX iOS/PWA) --- */
 
 function syncPWAHeight() {
     const mapEl = document.getElementById('map');
-    if (mapEl) {
-        // On force la hauteur sur la hauteur réelle de la fenêtre
-        mapEl.style.height = window.innerHeight + 'px';
-    }
-    // On vérifie si la variable 'map' existe (ta variable globale MapLibre)
-    if (typeof map !== 'undefined' && map.resize) {
-        map.resize();
+    if (!mapEl) return;
+
+    // On récupère la hauteur réelle disponible
+    const vh = window.innerHeight;
+    
+    // On ne met à jour QUE si la hauteur a changé (évite les calculs inutiles)
+    if (mapEl.style.height !== vh + 'px') {
+        mapEl.style.height = vh + 'px';
+        
+        // On prévient MapLibre que la taille a changé
+        if (typeof map !== 'undefined' && map.resize) {
+            map.resize();
+        }
     }
 }
 
-// On écoute le redimensionnement classique
+// On écoute les changements
 window.addEventListener('resize', syncPWAHeight);
+window.addEventListener('orientationchange', syncPWAHeight);
 
-// Forçage spécifique au mode PWA et au chargement
-const pwaInterval = setInterval(syncPWAHeight, 500); // On vérifie toutes les 0.5s
+// Forçage au démarrage (stratégie progressive)
+[0, 100, 500, 1000, 3000].forEach(delay => {
+    setTimeout(syncPWAHeight, delay);
+});
 
-// On arrête de forcer après 5 secondes (le temps que l'app soit stable)
-setTimeout(() => {
-    clearInterval(pwaInterval);
-}, 5000);
-
-// Appel immédiat au cas où
+// Appel immédiat
 syncPWAHeight();
