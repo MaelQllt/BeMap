@@ -19,9 +19,14 @@ body {
 
 /* --- CARTE --- */
 #map { 
-    position: absolute; top: 0; bottom: 0; width: 100%; 
+    position: fixed; /* Fixed est plus stable que absolute pour les PWA */
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    /* Ne pas mettre de bottom: 0 si on force la height en JS */
     transition: transform 0.7s cubic-bezier(0.19, 1, 0.22, 1), filter 0.7s cubic-bezier(0.19, 1, 0.22, 1);
     will-change: transform, filter;
+    z-index: 0;
 }
 
 /* --- MODAL --- */

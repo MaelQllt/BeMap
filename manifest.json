@@ -1,23 +1,17 @@
 {
-  "name": "BeReal Map",
-  "short_name": "BeRealMap",
+  "name": "BeMap.",
+  "short_name": "BeMap.",
   "start_url": "./index.html",
   "display": "standalone",
-  "display_override": ["fullscreen", "minimal-ui"],
+  "orientation": "portrait",
   "background_color": "#000000",
   "theme_color": "#000000",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180 192x192 512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
   ]
 }

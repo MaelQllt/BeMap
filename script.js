@@ -402,13 +402,12 @@ function openDashboard() {
 
     if (modal) modal.style.display = 'flex';
     
-    // Effet de zoom et flou sur la carte en arrière-plan
+    // On utilise style.transform au lieu de modifier tout le style
     if (mapEl) {
         mapEl.style.transform = 'scale(1.05)';
         mapEl.style.filter = 'blur(3px) brightness(0.4)';
     }
 
-    // Masquer le badge pour épurer l'interface
     if (badge) {
         badge.style.opacity = '0';
         badge.style.pointerEvents = 'none';
@@ -428,8 +427,8 @@ function closeDashboard() {
     if (modal) modal.style.display = 'none';
     
     if (mapEl) {
-        mapEl.style.transform = 'scale(1)';
-        mapEl.style.filter = 'none';
+        mapEl.style.transform = 'scale(1)'; // On reset le scale
+        mapEl.style.filter = 'none';        // On reset le flou
     }
 
     if (badge) {
@@ -450,6 +449,8 @@ const map = new maplibregl.Map({
 });4
 map.on('zoom', () => {
 });
+
+
 
 let currentRadiusMode = 60;
 
@@ -572,9 +573,17 @@ function openModal(photos) {
     currentIndex = 0; 
     currentMiniSide = 'left'; 
     updateModalContent();
+    
     modal.style.display = 'flex';
-    document.getElementById('map').style.cssText = 'scale(1.1); filter: blur(3px) brightness(0.4);';
-    badge.style.cssText += 'filter: blur(3px); pointer-events: none;';
+
+    // On modifie les propriétés une par une pour NE PAS toucher au height
+    const mapEl = document.getElementById('map');
+    mapEl.style.transform = 'scale(1.1)';
+    mapEl.style.filter = 'blur(3px) brightness(0.4)';
+
+    // Correction aussi pour le badge (évite le += qui peut bugger)
+    badge.style.filter = 'blur(3px)';
+    badge.style.pointerEvents = 'none';
 }
 
 function updateModalContent() {
@@ -610,8 +619,17 @@ function updateModalContent() {
 function closeModal() {
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
-    document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
-    badge.style.cssText = 'filter: none; pointer-events: auto;';
+    
+    // AU LIEU DE cssText, on modifie uniquement les propriétés de transformation
+    const mapEl = document.getElementById('map');
+    mapEl.style.transform = 'scale(1)';
+    mapEl.style.filter = 'none';
+    
+    // On relance un petit resize de sécurité
+    syncPWAHeight();
+
+    badge.style.filter = 'none';
+    badge.style.pointerEvents = 'auto';
 }
 
 // --- LOGIQUE PHOTO (DRAG & FLIP) ---
@@ -754,6 +772,11 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
         localStorage.setItem('bereal_session_active', 'true');
         
         initApp(userData, memoriesData, friendsData);
+
+        // Fix bande noire PWA
+        map.getCanvas().style.height = '100%';
+        map.resize();
+
         document.getElementById('upload-overlay').style.display = 'none';
     } catch (err) {
         alert("Dossier invalide.");
@@ -832,6 +855,10 @@ async function initApp(userData, memoriesData, friendsData) {
 
     // 4. Lancement des Statistiques (Pays, Départements, Streaks)
     calculateStats(memoriesData, userData, friendsData);
+    setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+        map.resize();
+    }, 300);
 }
 
 // #endregion
@@ -897,6 +924,13 @@ async function handleAutoLogin() {
 
             const startApp = () => {
                 initApp(userData, memoriesData, friendsData);
+                
+                // On force le resize ici aussi pour la PWA
+                setTimeout(() => {
+                    window.dispatchEvent(new Event('resize'));
+                    map.resize();
+                }, 300);
+                
                 loader.style.opacity = '0';
                 setTimeout(() => loader.style.display = 'none', 500);
             };
@@ -918,3 +952,48 @@ async function handleAutoLogin() {
 
 // Lancement
 handleAutoLogin();
+
+function fullResize() {
+    const vh = window.innerHeight;
+    document.documentElement.style.setProperty('--vh', `${vh}px`);
+    
+    // Ajout de la sécurité "&& map.resize"
+    if (typeof map !== 'undefined' && map && map.resize) {
+        map.resize();
+    }
+}
+
+window.addEventListener('resize', fullResize);
+
+// On garde tes délais, ils sont parfaits pour le comportement asynchrone d'iOS
+[100, 300, 500, 1000, 2000].forEach(delay => {
+    setTimeout(fullResize, delay);
+});
+
+// --- FIX FINAL POUR LA BANDE ROUGE PWA ---
+
+function syncPWAHeight() {
+    const mapEl = document.getElementById('map');
+    if (mapEl) {
+        // On force la hauteur sur la hauteur réelle de la fenêtre
+        mapEl.style.height = window.innerHeight + 'px';
+    }
+    // On vérifie si la variable 'map' existe (ta variable globale MapLibre)
+    if (typeof map !== 'undefined' && map.resize) {
+        map.resize();
+    }
+}
+
+// On écoute le redimensionnement classique
+window.addEventListener('resize', syncPWAHeight);
+
+// Forçage spécifique au mode PWA et au chargement
+const pwaInterval = setInterval(syncPWAHeight, 500); // On vérifie toutes les 0.5s
+
+// On arrête de forcer après 5 secondes (le temps que l'app soit stable)
+setTimeout(() => {
+    clearInterval(pwaInterval);
+}, 5000);
+
+// Appel immédiat au cas où
+syncPWAHeight();
