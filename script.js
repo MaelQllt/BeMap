@@ -697,7 +697,28 @@ function getLocalUrl(jsonPath) {
     console.warn("Fichier non trouvé dans l'archive :", cleanPath);
     return "";
 }
+// Ajout du support Swipe pour Mobile
+let touchStartX = 0;
+let touchEndX = 0;
 
+modal.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+}, {passive: true});
+
+modal.addEventListener('touchend', e => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+}, {passive: true});
+
+function handleSwipe() {
+    const swipeThreshold = 50; // distance min en pixels
+    if (touchEndX < touchStartX - swipeThreshold) {
+        nextPhoto(); // Swipe gauche -> Suivant
+    }
+    if (touchEndX > touchStartX + swipeThreshold) {
+        prevPhoto(); // Swipe droite -> Précédent
+    }
+}
 // #region 6. INITIALISATION & ASSETS
 let fileMap = {}; // Index pour retrouver les fichiers par leur nom
 

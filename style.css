@@ -689,3 +689,79 @@ body {
 .next-dash { right: -60px; }
 
 
+/* --- RESPONSIVE DASHBOARD --- */
+@media (max-width: 600px) {
+    .dashboard-content {
+        width: 85%;
+        padding: 20px;
+        border-radius: 28px;
+    }
+
+    .dashboard-title {
+        font-size: 22px;
+    }
+
+    .stat-value {
+        font-size: 28px; /* Plus petit pour éviter les retours à la ligne */
+    }
+
+    .stat-card {
+        padding: 15px 10px;
+    }
+
+    .streak-value {
+        font-size: 32px;
+    }
+
+    /* Repositionnement des flèches à l'intérieur sur Mobile */
+    .prev-dash { left: 10px; background: rgba(0,0,0,0.5); }
+    .next-dash { right: 10px; background: rgba(0,0,0,0.5); }
+    
+    .dash-nav {
+        width: 38px;
+        height: 38px;
+        top: 40%; /* Un peu plus haut pour ne pas gêner les pouces */
+    }
+}
+
+/* --- RESPONSIVE MODAL PHOTO --- */
+@media (max-width: 600px) {
+    .modal-content {
+        width: 92%;
+    }
+
+    .bereal-username {
+        font-size: 28px; /* Évite que les noms longs dépassent */
+    }
+
+    /* Cache les flèches latérales qui sortent de l'écran */
+    .nav-arrow.prev, .nav-arrow.next {
+        display: none !important; 
+    }
+
+    /* Optionnel: On peut ajouter des indicateurs de pagination discrets en bas */
+    .modal-content::after {
+        content: "Glissez pour naviguer";
+        font-size: 10px;
+        color: rgba(255,255,255,0.4);
+        margin-top: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+}
+
+@media (max-width: 600px) {
+    .user-profile-header {
+        top: 15px;
+        left: 15px;
+    }
+
+    .profile-pic-container {
+        width: 50px;
+        height: 50px;
+    }
+
+    #header-username {
+        font-size: 12px;
+    }
+}
