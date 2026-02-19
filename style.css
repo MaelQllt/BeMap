@@ -604,3 +604,24 @@ body {
 .logout-card-minimal:active {
     transform: scale(0.95);
 }
+
+/* Animation de la roue de chargement */
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid #ffffff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* On s'assure que l'overlay d'upload ne clignote pas au dessus du loader */
+#upload-overlay {
+    z-index: 20000; /* Juste en dessous du loader */
+}
+

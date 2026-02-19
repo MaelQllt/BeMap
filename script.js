@@ -11,8 +11,18 @@
  */
 
 
+// TEST IMMÉDIAT : Si une session est active, on montre l'écran noir avant même que le reste charge
+if (localStorage.getItem('bereal_session_active') === 'true') {
+    document.getElementById('loading-screen').style.display = 'flex';
+    document.getElementById('upload-overlay').style.display = 'none';
+} else {
+    document.getElementById('upload-overlay').style.display = 'flex';
+}
+
 const DB_NAME = "BeRealMapDB";
 const STORE_NAME = "files";
+// Supprime la ligne : document.getElementById('upload-overlay').style.display = 'flex'; (elle est gérée au dessus)
+
 
 // À mettre juste après tes déclarations de variables globales
 document.getElementById('upload-overlay').style.display = 'flex';
@@ -20,7 +30,7 @@ document.getElementById('upload-overlay').style.display = 'flex';
 // Initialise la connexion à la base de données
 function openDB() {
     return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, 1);
+        const request = indexedDB.open(DB_NAME, 1); // Toujours version 1
         request.onupgradeneeded = (e) => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -28,7 +38,7 @@ function openDB() {
             }
         };
         request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        request.onerror = (e) => reject("Erreur openDB: " + e.target.error);
     });
 }
 
@@ -48,41 +58,26 @@ async function saveFileToSession(path, file) {
 // Récupère tous les fichiers de la session
 async function loadSessionFiles() {
     const db = await openDB();
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE_NAME, "readonly");
         const store = tx.objectStore(STORE_NAME);
-        const keysRequest = store.getAllKeys();
+        const request = store.openCursor();
+        const results = {};
 
-        keysRequest.onsuccess = () => {
-            const keys = keysRequest.result;
-            const valuesRequest = store.getAll();
-            
-            valuesRequest.onsuccess = () => {
-                const values = valuesRequest.result;
-                const results = {};
-                
-                for (let i = 0; i < keys.length; i++) {
-                    const data = values[i];
-                    if (data && data.buffer instanceof ArrayBuffer) {
-                        results[keys[i]] = new File([data.buffer], data.name || keys[i], { type: data.type || '' });
-                    }
+        request.onsuccess = (e) => {
+            const cursor = e.target.result;
+            if (cursor) {
+                const data = cursor.value;
+                const key = cursor.key;
+                if (data && data.buffer) {
+                    results[key] = new File([data.buffer], data.name || key, { type: data.type || '' });
                 }
-                
-                console.log("loadSessionFiles OK :", Object.keys(results).length, "fichiers");
-                console.log("user.json présent ?", !!results['user.json']);
+                cursor.continue();
+            } else {
                 resolve(results);
-            };
-            
-            valuesRequest.onerror = (e) => {
-                console.error("Erreur getAll :", e);
-                resolve({});
-            };
+            }
         };
-        
-        keysRequest.onerror = (e) => {
-            console.error("Erreur getAllKeys :", e);
-            resolve({});
-        };
+        request.onerror = () => reject("Erreur Cursor");
     });
 }
 
@@ -523,7 +518,6 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
 
 // Nouvelle fonction de démarrage
 async function initApp(userData, memoriesData) {
-    console.log("Démarrage de l'initialisation avec les données locales...");
 
     // 1. Mise à jour du Profil (Textes et Image)
     const name = userData.username || "Utilisateur";
@@ -617,40 +611,49 @@ function prevPhoto() {
         updateModalContent();
     }
 }
+
+
 /**
- * BLOC DE DÉMARRAGE UNIQUE (AUTO-LOGIN)
+ * GESTION DU DÉMARRAGE ET DE LA SESSION
  */
+
 async function handleAutoLogin() {
-    let keys = [];
+    const loader = document.getElementById('loading-screen');
+    const uploadOverlay = document.getElementById('upload-overlay');
+
     try {
         const savedFiles = await loadSessionFiles();
-        keys = Object.keys(savedFiles);
+        const keys = Object.keys(savedFiles);
 
         if (keys.length > 0 && savedFiles['user.json'] && savedFiles['memories.json']) {
             fileMap = savedFiles;
-            document.getElementById('upload-overlay').style.display = 'none';
+            
+            // On masque l'upload immédiatement si on a des fichiers
+            uploadOverlay.style.display = 'none';
 
-            const decoder = new TextDecoder();
-            const userData = JSON.parse(decoder.decode(await savedFiles['user.json'].arrayBuffer()));
-            const memoriesData = JSON.parse(decoder.decode(await savedFiles['memories.json'].arrayBuffer()));
+            const userData = JSON.parse(await savedFiles['user.json'].text());
+            const memoriesData = JSON.parse(await savedFiles['memories.json'].text());
 
-            const launch = () => {
+            const startApp = () => {
                 initApp(userData, memoriesData);
-                document.getElementById('loading-screen').style.display = 'none';
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 500);
             };
 
-            if (map.isStyleLoaded()) launch();
-            else map.once('style.load', launch);
+            if (map.loaded()) startApp();
+            else map.once('load', startApp);
 
         } else {
-            document.getElementById('loading-screen').style.display = 'none';
-            document.getElementById('upload-overlay').style.display = 'flex';
+            console.warn("Session incomplète ou vide. Redirection upload.");
+            loader.style.display = 'none';
+            uploadOverlay.style.display = 'flex';
         }
     } catch (err) {
-        console.error("Erreur critique:", err);
-        document.getElementById('loading-screen').style.display = 'none';
-        document.getElementById('upload-overlay').style.display = 'flex';
+        console.error("Crash handleAutoLogin:", err);
+        loader.style.display = 'none';
+        uploadOverlay.style.display = 'flex';
     }
 }
-// On lance le processus
+
+// Lancement
 handleAutoLogin();

@@ -18,6 +18,12 @@
 
 <body>
 
+    <!-- Écran de chargement -->
+    <div id="loading-screen" style="position:fixed; inset:0; background:#000; z-index:20001; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'Inter', sans-serif;">
+        <div class="spinner"></div>
+        <span style="color:white; margin-top:20px; font-weight:300; letter-spacing:1px; font-size:14px;">CHARGEMENT...</span>
+    </div>
+
     <div id="upload-overlay" style="display:none;">
         <div class="upload-card">
             <h2>BeReal. <span style="font-weight: 100;">Map</span></h2>
@@ -27,9 +33,6 @@
             <div id="status-msg"></div>
         </div>
     </div>
-
-    <!-- Écran noir pendant le chargement -->
-    <div id="loading-screen" style="position:fixed;inset:0;background:#000;z-index:9999;display:flex;"></div>
 
     <!-- Badge de profil coin supérieur gauche -->
     <div class="user-profile-header">
