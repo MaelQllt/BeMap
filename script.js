@@ -174,10 +174,46 @@ let currentDashPage = 1;
 /**
  * Alterne entre les pages du dashboard (Stats Photos <-> Social)
  */
-function switchDash() {
-    currentDashPage = (currentDashPage === 1) ? 2 : 1;
-    document.getElementById('dash-page-1').style.display = (currentDashPage === 1) ? 'block' : 'none';
-    document.getElementById('dash-page-2').style.display = (currentDashPage === 2) ? 'block' : 'none';
+let isAnimatingDash = false;
+
+function switchDash(direction = 'right') {
+    if (isAnimatingDash) return;
+    isAnimatingDash = true;
+
+    const slider = document.getElementById('dash-slider');
+    
+    // 1. On réduit la durée à 0.4s pour plus de nervosité
+    const animDuration = 400; 
+    // 2. On libère le clic un peu avant la fin (après 300ms) pour permettre l'enchaînement
+    const unlockDelay = 300; 
+
+    slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+
+    if (direction === 'right') {
+        slider.style.transform = 'translateX(-50%)';
+        
+        setTimeout(() => {
+            slider.style.transition = 'none';
+            slider.appendChild(slider.firstElementChild);
+            slider.style.transform = 'translateX(0%)';
+            // On ne met PAS isAnimatingDash ici
+        }, animDuration);
+        
+    } else {
+        slider.style.transition = 'none';
+        slider.prepend(slider.lastElementChild);
+        slider.style.transform = 'translateX(-50%)';
+        
+        slider.offsetHeight; // Force reflow
+        
+        slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        slider.style.transform = 'translateX(0%)';
+    }
+
+    // LE SECRET : On débloque le bouton AVANT que l'animation soit totalement finie
+    setTimeout(() => {
+        isAnimatingDash = false;
+    }, unlockDelay);
 }
 
 /**

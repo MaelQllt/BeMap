@@ -324,9 +324,12 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
 }
+
 .dashboard-header {
+    position: relative;
+    z-index: 20; /* Plus haut que les cartes qui "gonflent" */
     display: flex; 
-    justify-content: space-between; /* Change par 'center' ou 'flex-end' pour déplacer le titre */
+    justify-content: space-between;
     align-items: center; 
     margin-bottom: 30px;
     padding: 0 10px;
@@ -659,14 +662,65 @@ body {
     z-index: 20000; /* Juste en dessous du loader */
 }
 
-/* Navigation entre pages du dashboard */
-.dash-page {
-    animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
+
+
+#dash-cards-wrapper {
+    overflow: visible; /* CRUCIAL : permet aux cartes de gonfler sans être coupées */
+    position: relative;
+    width: 100%;
+    /* On ajoute un masque conteneur pour l'effet de slide propre */
+    clip-path: inset(-100% 0px -100% 0px); 
 }
 
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+#dash-slider {
+    display: flex;
+    width: 200%;
+    transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.dash-page {
+    width: 50%;
+    flex-shrink: 0;
+    display: block !important;
+    /* L'ASTUCE : On met du padding latéral pour créer l'espace vide entre les deux pages */
+    padding: 0 10px; 
+    box-sizing: border-box;
+}
+
+#dash-page-1, #dash-page-2 {
+    width: 50%;
+    flex-shrink: 0;
+}
+
+
+.dash-page.exiting-left {
+    animation: exitToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.exiting-right {
+    animation: exitToRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.entering-right {
+    animation: enterFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.entering-left {
+    animation: enterFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes exitToLeft {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(-60px); opacity: 0; }
+}
+@keyframes exitToRight {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(60px); opacity: 0; }
+}
+@keyframes enterFromRight {
+    from { transform: translateX(60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes enterFromLeft {
+    from { transform: translateX(-60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
 }
 
 /* --- BOUTONS NAVIGATION DASHBOARD (Style Modale Photo) --- */
