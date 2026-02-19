@@ -288,6 +288,47 @@ const map = new maplibregl.Map({
     zoom: 5.5, 
     maxZoom: 17
 });
+// À placer dans la #region 4
+// Affiche le zoom en temps réel dans la console (F12)
+map.on('zoom', () => {
+});
+
+let currentRadiusMode = 60;
+
+function watchZoomRadius(features) {
+    map.on('zoomend', () => {
+        const zoom = map.getZoom();
+        
+        // Par défaut, on met un rayon large (80) pour forcer le regroupement.
+        // On affinera le seuil (ici 14) quand tu m'auras donné ta valeur.
+        let newRadius = zoom >= 16 ? 130 : 50; 
+
+        if (newRadius !== currentRadiusMode) {
+            currentRadiusMode = newRadius;
+            updateMapSource(features, newRadius);
+        }
+    });
+}
+
+function updateMapSource(features, radius) {
+    if (!map.getSource('bereal-src')) return;
+
+    // Suppression propre des layers
+    if (map.getLayer('clusters')) map.removeLayer('clusters');
+    if (map.getLayer('unclustered-point')) map.removeLayer('unclustered-point');
+
+    map.removeSource('bereal-src');
+
+    map.addSource('bereal-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features },
+        cluster: true,
+        clusterMaxZoom: 22, // Bloque l'éclatement automatique par zoom
+        clusterRadius: radius // Seul critère : la proximité en pixels
+    });
+
+    reAddLayers();
+}
 
 function setupMapLayers(features) {
     if (map.getSource('bereal-src')) return;
@@ -573,21 +614,19 @@ async function initApp(userData, memoriesData) {
 
     // 3. Chargement de la Carte
     if (features.length > 0) {
-        // On crée une petite fonction interne pour être sûr de l'ordre
         const injectFeatures = () => {
             if (!map.getSource('bereal-src')) {
                 setupMapLayers(features);
+                // AJOUTER CETTE LIGNE ICI :
+                watchZoomRadius(features); 
             }
         };
 
         if (map.loaded()) {
             injectFeatures();
         } else {
-            // On utilise 'load' ET 'style.load' pour être certain
             map.once('load', injectFeatures);
         }
-    } else {
-        console.warn("Aucune donnée de localisation trouvée.");
     }
 
     // 4. Lancement des Statistiques (Pays, Départements, Streaks)
