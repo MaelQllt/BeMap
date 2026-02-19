@@ -382,6 +382,8 @@ body {
     cursor: default;
 }
 
+
+
 /* --- INTERACTION CARTE --- */
 .stat-card:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -417,13 +419,12 @@ body {
 }
 
 
-/* Remplace ta classe .streak-card par celle-ci */
 .streak-card {
-    grid-column: span 2; /* Elle prend toute la largeur du grid */
+    grid-column: span 2;
     background: #ffffff;
     color: #1a1a1a;
-    padding: 0 25px; /* On enlève le padding vertical fixe pour laisser le grid gérer la hauteur */
-    height: 110px; /* Optionnel : Ajuste cette valeur pour matcher exactement la hauteur visuelle de tes stat-cards */
+    padding: 0 25px;
+    height: 110px;
     border-radius: 28px;
     display: flex;
     justify-content: space-between;
@@ -462,44 +463,42 @@ body {
     transform: scale(1.02);
 }
 
+/* --- BASE DES ICÔNES --- */
 .streak-icon {
     font-size: 40px;
-    display: inline-block;
-    transform-origin: bottom center;
-    cursor: pointer;
-    /* On active les événements uniquement sur l'icône */
-    pointer-events: auto; 
-    transition: transform 0.3s ease;
-    /* On définit une zone de survol un peu plus large pour que l'animation ne "sorte" pas de la souris */
-    padding: 10px;
-    margin: -10px;
+    display: inline-block; /* CRUCIAL pour que les rotations fonctionnent */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease;
+    pointer-events: auto; /* S'assure que l'icône capte bien la souris */
 }
 
-/* L'animation ne se déclenche QUE si on survole l'icône elle-même */
-.streak-icon:hover {
-    animation: flameWobble 0.5s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px rgba(255, 100, 0, 0.5));
+/* 1. Les deux grossissent quand on survole la CARTE */
+.streak-card:hover .streak-icon {
+    transform: scale(1.2);
 }
 
-.streak-card:hover{
-    color: #000000;
-    transform: scale(1.02);
+/* 2. LA FLAMME : Animation active UNIQUEMENT au survol direct de l'icône */
+/* On cible soit la classe flame-icon, soit l'icône dans la carte qui a l'ID du record */
+.flame-icon:hover, 
+.streak-card:has(#stat-max-streak) .streak-icon:hover {
+    animation: flameWobble 0.5s ease-in-out infinite !important;
+    filter: drop-shadow(0 0 12px rgba(255, 100, 0, 0.8));
 }
 
-.streak-card:hover .streak-label{
-    color: #000000;
-    transform: scale(1.02);
+/* 3. LE CALENDRIER : Simple scale au survol direct, sans bouger */
+.calendar-icon:hover,
+.streak-card:has(#stat-join-date) .streak-icon:hover {
+    transform: scale(1.3) !important;
+    animation: none !important;
 }
 
-
+/* --- L'ANIMATION (Assure-toi que les valeurs de scale match l'état survolé) --- */
 @keyframes flameWobble {
-    0% { transform: scale(1) rotate(-5deg); }
-    25% { transform: scale(1.1) rotate(3deg); }
-    50% { transform: scale(1.05) rotate(-3deg); }
-    75% { transform: scale(1.15) rotate(2deg); }
-    100% { transform: scale(1) rotate(-5deg); }
+    0% { transform: scale(1.4) rotate(-8deg); }
+    25% { transform: scale(1.5) rotate(5deg); }
+    50% { transform: scale(1.45) rotate(-5deg); }
+    75% { transform: scale(1.55) rotate(4deg); }
+    100% { transform: scale(1.4) rotate(-8deg); }
 }
-
 
 /* --- OVERLAY D'UPLOAD --- */
 #upload-overlay {
@@ -557,12 +556,14 @@ body {
 }
 
 /* --- BOUTON DÉCONNEXION MINIMALISTE (HORS MODAL) --- */
+/* Le wrapper devient la zone de détection (Hitbox fixe) */
 .logout-wrapper {
     display: flex;
     justify-content: center;
     width: 100%;
-    /* margin-top: 25px;  <-- Tu peux supprimer ou commenter cette ligne */
+    padding: 15px 0; /* Crée une zone de confort autour du bouton */
     animation: fadeIn 0.8s ease-out;
+    cursor: pointer;
 }
 
 .logout-card-minimal {
@@ -571,11 +572,37 @@ body {
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    cursor: pointer;
     display: inline-flex;
     align-items: center;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+    pointer-events: none; /* Le bouton ignore la souris, c'est le wrapper qui gère tout */
+}
+
+/* QUAND ON SURVOLE LE WRAPPER (qui est fixe), ON FAIT BOUGER LA CARTE */
+.logout-wrapper:hover .logout-card-minimal {
+    background: rgba(255, 68, 68, 0.1); 
+    border-color: rgba(255, 68, 68, 0.3);
+    transform: translateY(-3px); 
+}
+
+/* On applique aussi les changements de texte via le wrapper */
+.logout-wrapper:hover .logout-label-minimal {
+    color: #ff6666;
+    font-weight: 400;
+    transform: scale(1.02);
+}
+
+/* Effet au clic sur le wrapper */
+.logout-wrapper:active .logout-card-minimal {
+    transform: scale(0.95);
+}
+
+.logout-card-minimal:hover {
+    background: rgba(255, 68, 68, 0.1); 
+    border-color: rgba(255, 68, 68, 0.3);
+    /* Le mouvement est fluide et ne causera plus de tremblement */
+    transform: translateY(-3px); 
 }
 
 .logout-label-minimal {
@@ -587,12 +614,7 @@ body {
     transition: all 0.3s ease;
 }
 
-/* --- EFFET AU SURVOL (Identique aux stats mais plus léger) --- */
-.logout-card-minimal:hover {
-    background: rgba(255, 68, 68, 0.1); 
-    border-color: rgba(255, 68, 68, 0.3);
-    transform: translateY(-3px); /* Soulèvement subtil */
-}
+
 
 .logout-card-minimal:hover .logout-label-minimal {
     color: #ff6666; /* Le texte s'éclaire en rouge */
@@ -624,4 +646,46 @@ body {
 #upload-overlay {
     z-index: 20000; /* Juste en dessous du loader */
 }
+
+/* Navigation entre pages du dashboard */
+.dash-page {
+    animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1);
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+/* --- BOUTONS NAVIGATION DASHBOARD (Style Modale Photo) --- */
+.dash-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.15); /* Même fond que les flèches photo */
+    border: none;
+    color: white;
+    width: 45px; /* Taille légèrement réduite pour le dashboard */
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    opacity: 1; /* On garde l'opacité pleine */
+    transition: all 0.3s ease;
+    font-size: 20px; /* Pour le symbole */
+}
+
+.dash-nav:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.prev-dash { left: -60px; }
+.next-dash { right: -60px; }
+
 

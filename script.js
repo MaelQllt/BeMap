@@ -21,10 +21,8 @@ if (localStorage.getItem('bereal_session_active') === 'true') {
 
 const DB_NAME = "BeRealMapDB";
 const STORE_NAME = "files";
-// Supprime la ligne : document.getElementById('upload-overlay').style.display = 'flex'; (elle est gérée au dessus)
 
 
-// À mettre juste après tes déclarations de variables globales
 document.getElementById('upload-overlay').style.display = 'flex';
 
 // Initialise la connexion à la base de données
@@ -105,6 +103,7 @@ const badge = document.querySelector('.user-profile-header');
 
 // Variables d'état des photos
 let currentPhotos = [], currentIndex = 0, isFlipped = false;
+let currentMiniSide = 'left';
 let isDragging = false, dragStartX, dragStartY, hasDragged = false, justFinishedDrag = false;
 
 // Variables de Zoom & Pan
@@ -114,6 +113,7 @@ let lastMouseX, lastMouseY;
 // Cache & Markers
 let cachedStats = null;
 let clusterMarkers = {};
+
 // #endregion
 
 
@@ -182,41 +182,63 @@ badge.addEventListener('click', () => {
 });
 // #endregion
 
-
 // #region 3. STATISTIQUES & DASHBOARD
-async function calculateStats(data) {
+
+let currentDashPage = 1;
+
+/**
+ * Alterne entre les pages du dashboard (Stats Photos <-> Social)
+ */
+function switchDash() {
+    currentDashPage = (currentDashPage === 1) ? 2 : 1;
+    document.getElementById('dash-page-1').style.display = (currentDashPage === 1) ? 'block' : 'none';
+    document.getElementById('dash-page-2').style.display = (currentDashPage === 2) ? 'block' : 'none';
+}
+
+/**
+ * Calcule toutes les statistiques à partir des fichiers JSON
+ * @param {Array} data - Contenu de memories.json
+ * @param {Object} userData - Contenu de user.json
+ * @param {Array} friendsData - Contenu de friends.json
+ */
+async function calculateStats(data, userData, friendsData) {
     try {
-        // 1. STREAK & TOTAL
+        // --- 1. CALCUL DE LA STREAK ---
         const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
         const uniqueDays = [...new Set(days)];
-        let maxStreak = 0, currentStr = 0;
+        let maxStreak = 0, currentStreak = 0;
         for (let i = 0; i < uniqueDays.length; i++) {
-            if (i === 0) currentStr = 1;
+            if (i === 0) currentStreak = 1;
             else {
-                const diff = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
-                if (diff === 1) currentStr++;
-                else { maxStreak = Math.max(maxStreak, currentStr); currentStr = 1; }
+                const diffDays = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
+                if (diffDays === 1) currentStreak++;
+                else { maxStreak = Math.max(maxStreak, currentStreak); currentStreak = 1; }
             }
-            maxStreak = Math.max(maxStreak, currentStr);
+            maxStreak = Math.max(maxStreak, currentStreak);
         }
 
-        // 2. PONCTUALITÉ
-        const momentIds = [...new Set(data.map(m => m.berealMoment || m.date.split('T')[0]))];
+        // 2. PONCTUALITÉ (% à l'heure)
+        // On identifie les moments uniques (un BeReal + ses Bonus = 1 seul moment)
+        const momentIds = [...new Set(data.map(m => m.berealMoment || m.takenTime?.split('T')[0]))];
         let onTimeCount = 0;
+        
         momentIds.forEach(id => {
-            if (data.some(m => (m.berealMoment === id || m.date.split('T')[0] === id) && m.isLate === false)) onTimeCount++;
+            // Si au moins une photo de ce moment n'est pas "Late", on compte comme à l'heure
+            if (data.some(m => (m.berealMoment === id || m.takenTime?.split('T')[0] === id) && m.isLate === false)) {
+                onTimeCount++;
+            }
         });
         const percent = momentIds.length > 0 ? Math.round((onTimeCount / momentIds.length) * 100) : 0;
 
-        // 3. GÉOGRAPHIE (PAYS & DEPS)
+        // 3. GÉOGRAPHIE (PAYS & DÉPARTEMENTS) via Turf.js
         const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
         const uniqueGeoPoints = validMemories.map(m => [m.location.longitude, m.location.latitude]);
 
-        // On récupère les frontières pour le calcul
         const [respWorld, respDeps] = await Promise.all([
             fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
             fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
         ]);
+        
         const worldGeo = await respWorld.json();
         const depsGeo = await respDeps.json();
         
@@ -225,14 +247,16 @@ async function calculateStats(data) {
 
         uniqueGeoPoints.forEach(coords => {
             const pt = turf.point(coords);
-            // Check Pays
+            
+            // Check Pays (Monde)
             for (let c of worldGeo.features) {
                 if (turf.booleanPointInPolygon(pt, c)) {
                     foundCountries.add(c.properties.ADMIN || c.properties.name);
                     break;
                 }
             }
-            // Check Départements (si en France)
+            
+            // Check Départements (France - Box approximative pour performance)
             if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 52) {
                 for (let d of depsGeo.features) {
                     if (turf.booleanPointInPolygon(pt, d)) {
@@ -243,42 +267,157 @@ async function calculateStats(data) {
             }
         });
 
+        // 4. SOCIAL & ANCIENNÉTÉ (Nouveaux calculs)
+        const joinDate = userData.createdAt ? new Date(userData.createdAt) : new Date();
+        const today = new Date();
+        const diffDays = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
+        const formattedJoinDate = joinDate.toLocaleDateString('fr-FR', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+        });
+
+        // 5. CALCUL DU MOIS RECORD & HEURE MOYENNE
+        const monthCounts = {};
+        let totalMinutes = 0;
+        let validTimeCount = 0;
+
+        data.forEach(m => {
+            if (m.takenTime) {
+                const d = new Date(m.takenTime);
+                
+                // Mois Record (ex: "mars 2024")
+                let monthKey = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+                monthKey = monthKey.charAt(0).toUpperCase() + monthKey.slice(1);
+                monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
+
+                // Heure Moyenne
+                totalMinutes += (d.getHours() * 60) + d.getMinutes();
+                validTimeCount++;
+            }
+        });
+
+        // Trouver le mois avec le max de photos
+        let bestMonthName = "-";
+        let maxPhotos = 0;
+
+        for (const [month, count] of Object.entries(monthCounts)) {
+            if (count > maxPhotos) {
+                maxPhotos = count;
+                bestMonthName = month;
+            }
+}
+
+        // Calcul heure moyenne
+        let avgTimeStr = "--:--";
+        if (validTimeCount > 0) {
+            const avgMinutesTotal = totalMinutes / validTimeCount;
+            const hh = Math.floor(avgMinutesTotal / 60);
+            const mm = Math.round(avgMinutesTotal % 60);
+            avgTimeStr = `${hh}H${mm.toString().padStart(2, '0')}`;
+        }
+
+        // 6. MISE EN CACHE DES RÉSULTATS
         cachedStats = { 
             total: data.length, 
             percent: percent, 
             countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0), 
             deps: foundDeps.size, 
-            maxStreak 
+            maxStreak: maxStreak,
+            friends: friendsData ? friendsData.length : 0,
+            daysOld: diffDays,
+            joinDate: formattedJoinDate,
+            bestMonthName: bestMonthName,
+            bestMonthLabel: `MOIS RECORD (${maxPhotos} BEREALS)`,
+            avgTime: avgTimeStr    
         };
         
         updateDashboardUI();
+
     } catch (e) { 
-        console.error("Erreur calcul stats:", e); 
+        console.error("Erreur calcul stats détaillé:", e); 
     }
 }
 
+/**
+ * Met à jour les éléments HTML du dashboard avec les valeurs calculées
+ */
 function updateDashboardUI() {
     if (!cachedStats) return;
-    const ids = { 'stat-streak': cachedStats.total, 'stat-ontime': `${cachedStats.percent}%`, 'stat-countries': cachedStats.countries, 'stat-deps': cachedStats.deps, 'stat-max-streak': cachedStats.maxStreak };
-    for (let id in ids) { const el = document.getElementById(id); if (el) el.innerText = ids[id]; }
+
+    const mapping = { 
+        'stat-streak': cachedStats.total, 
+        'stat-ontime': `${cachedStats.percent}%`, 
+        'stat-countries': cachedStats.countries, 
+        'stat-deps': cachedStats.deps, 
+        'stat-max-streak': cachedStats.maxStreak,
+        'stat-friends': cachedStats.friends,
+        'stat-age': cachedStats.daysOld,
+        'stat-join-date': cachedStats.joinDate,
+        'stat-best-month-name': cachedStats.bestMonthName,
+        'stat-best-month-label': cachedStats.bestMonthLabel,
+        'stat-avg-time': cachedStats.avgTime.toUpperCase()
+    };
+
+    for (let id in mapping) { 
+        const el = document.getElementById(id); 
+        if (el) el.innerText = mapping[id]; 
+    }
 }
 
+/**
+ * Ouvre le dashboard avec les effets visuels sur la carte
+ */
 function openDashboard() {
-    document.getElementById('dashboard-modal').style.display = 'flex';
-    document.getElementById('map').style.cssText = 'transform: scale(1.05); filter: blur(3px) brightness(0.4);';
-    badge.style.opacity = '0';
-    badge.style.pointerEvents = 'none';
+    const modal = document.getElementById('dashboard-modal');
+    const mapEl = document.getElementById('map');
+    const badge = document.querySelector('.user-profile-header');
+
+    currentDashPage = 1; 
+    const p1 = document.getElementById('dash-page-1');
+    const p2 = document.getElementById('dash-page-2');
+    if (p1) p1.style.display = 'block';
+    if (p2) p2.style.display = 'none';
+
+    if (modal) modal.style.display = 'flex';
+    
+    // Effet de zoom et flou sur la carte en arrière-plan
+    if (mapEl) {
+        mapEl.style.transform = 'scale(1.05)';
+        mapEl.style.filter = 'blur(3px) brightness(0.4)';
+    }
+
+    // Masquer le badge pour épurer l'interface
+    if (badge) {
+        badge.style.opacity = '0';
+        badge.style.pointerEvents = 'none';
+    }
+
     if (cachedStats) updateDashboardUI();
 }
 
+/**
+ * Ferme le dashboard et restaure l'état de la carte
+ */
 function closeDashboard() {
-    document.getElementById('dashboard-modal').style.display = 'none';
-    document.getElementById('map').style.cssText = 'transform: scale(1); filter: none;';
-    badge.style.opacity = '1';
-    badge.style.pointerEvents = 'auto';
-}
-// #endregion
+    const modal = document.getElementById('dashboard-modal');
+    const mapEl = document.getElementById('map');
+    const badge = document.querySelector('.user-profile-header');
 
+    if (modal) modal.style.display = 'none';
+    
+    if (mapEl) {
+        mapEl.style.transform = 'scale(1)';
+        mapEl.style.filter = 'none';
+    }
+
+    if (badge) {
+        badge.style.opacity = '1';
+        badge.style.pointerEvents = 'auto';
+    }
+}
+
+// #endregion
 
 // #region 4. GESTION DE LA CARTE (MapLibre)
 const map = new maplibregl.Map({
@@ -287,9 +426,7 @@ const map = new maplibregl.Map({
     center: [2.21, 46.22], 
     zoom: 5.5, 
     maxZoom: 17
-});
-// À placer dans la #region 4
-// Affiche le zoom en temps réel dans la console (F12)
+});4
 map.on('zoom', () => {
 });
 
@@ -299,9 +436,7 @@ function watchZoomRadius(features) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
         
-        // Par défaut, on met un rayon large (80) pour forcer le regroupement.
-        // On affinera le seuil (ici 14) quand tu m'auras donné ta valeur.
-        let newRadius = zoom >= 16 ? 130 : 50; 
+        let newRadius = zoom >= 16 ? 80 : 50; 
 
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
@@ -309,7 +444,6 @@ function watchZoomRadius(features) {
         }
     });
 }
-
 function updateMapSource(features, radius) {
     if (!map.getSource('bereal-src')) return;
 
@@ -323,8 +457,8 @@ function updateMapSource(features, radius) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features },
         cluster: true,
-        clusterMaxZoom: 22, // Bloque l'éclatement automatique par zoom
-        clusterRadius: radius // Seul critère : la proximité en pixels
+        clusterMaxZoom: 22, 
+        clusterRadius: radius 
     });
 
     reAddLayers();
@@ -369,19 +503,30 @@ function setupMapLayers(features) {
     });
 
     // Clics
+    // Clics sur les clusters
     map.on('click', 'clusters', (e) => {
         const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
         const clusterId = f.properties.cluster_id;
         const coords = f.geometry.coordinates;
-        const isNullIsland = Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1;
+        const currentZoom = map.getZoom();
 
-        if (isNullIsland || map.getZoom() >= 13.5) {
+        // CONDITION : Si c'est "Null Island" OU si on est au zoom 16 ou plus
+        if ((Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1) || currentZoom >= 16) {
             map.getSource('bereal-src').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-                if (!err) openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
+                if (!err) {
+                    // On récupère les photos et on les trie par date (plus récent en premier)
+                    openModal(leaves.map(l => l.properties).sort((a,b) => new Date(b.rawDate) - new Date(a.rawDate)));
+                }
             });
         } else {
+            // Sinon, on essaie de zoomer pour éclater le cluster
             map.getSource('bereal-src').getClusterExpansionZoom(clusterId, (err, zoom) => {
-                if (!err) map.easeTo({ center: coords, zoom: Math.min(zoom, 14.5) });
+                if (!err) {
+                    map.easeTo({ 
+                        center: coords, 
+                        zoom: Math.min(zoom, 16.5) // On s'arrête juste après le seuil
+                    });
+                }
             });
         }
     });
@@ -399,8 +544,12 @@ function reAddLayers() {
 
 
 // #region 5. MODALE, FLIP, ZOOM & PAN
+
+
 function openModal(photos) {
-    currentPhotos = photos; currentIndex = 0; 
+    currentPhotos = photos; 
+    currentIndex = 0; 
+    currentMiniSide = 'left'; 
     updateModalContent();
     modal.style.display = 'flex';
     document.getElementById('map').style.cssText = 'scale(1.1); filter: blur(3px) brightness(0.4);';
@@ -409,14 +558,26 @@ function openModal(photos) {
 
 function updateModalContent() {
     const p = currentPhotos[currentIndex];
-    isFlipped = false; resetZoomState();
+    isFlipped = false; 
+    resetZoomState();
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption;
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
     
     container.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
-    miniBox.style.cssText = 'transition: none; left: 14px; top: 14px;';
+    
+    // --- MODIFICATION ICI ---
+    miniBox.style.transition = 'none';
+    if (currentMiniSide === 'right') {
+        // On calcule la position à droite
+        const rightPos = container.offsetWidth - miniBox.offsetWidth - 28;
+        miniBox.style.transform = `translate(${rightPos}px, 0px)`;
+    } else {
+        miniBox.style.transform = `translate(0px, 0px)`;
+    }
+    // -------------------------
+
     document.getElementById('prevBtn').style.display = (currentPhotos.length > 1 && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (currentPhotos.length > 1 && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
 }
@@ -460,6 +621,9 @@ document.addEventListener('mouseup', () => {
             justFinishedDrag = true;
             miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (container.getBoundingClientRect().left + container.offsetWidth/2);
+        
+            currentMiniSide = snapRight ? 'right' : 'left'; 
+
             miniBox.style.transform = snapRight ? `translate(${container.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
             setTimeout(() => justFinishedDrag = false, 500);
         }
@@ -500,27 +664,40 @@ photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mi
 function getLocalUrl(jsonPath) {
     if (!jsonPath) return "";
     
-    // 1. On enlève le premier slash s'il existe : "/Photos/..." -> "Photos/..."
+    // 1. On nettoie le chemin (enlève le slash initial)
     let cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
     
-    // 2. Parfois le JSON contient "Photos/AF9Ta.../post/img.webp" 
-    // Si c'est le cas, on doit garder uniquement "Photos/post/img.webp" ou "Photos/profile/img.webp"
-    if (cleanPath.includes('/post/')) {
-        const parts = cleanPath.split('/');
-        cleanPath = "Photos/post/" + parts[parts.length - 1];
-    } else if (cleanPath.includes('/profile/')) {
-        const parts = cleanPath.split('/');
-        cleanPath = "Photos/profile/" + parts[parts.length - 1];
+    // 2. Stratégie de recherche :
+    // On essaie d'abord le chemin exact fourni par le JSON
+    if (fileMap[cleanPath]) {
+        return URL.createObjectURL(fileMap[cleanPath]);
     }
 
-    const file = fileMap[cleanPath];
-    if (file) {
-        return URL.createObjectURL(file);
-    } else {
-        console.warn("Fichier non trouvé dans l'archive :", cleanPath);
-        return "";
+    // 3. Si non trouvé, on simplifie le chemin pour correspondre à l'archive standard
+    // On extrait juste le nom du fichier (ex: image.webp)
+    const parts = cleanPath.split('/');
+    const fileName = parts[parts.length - 1];
+
+    // On cherche si le fichier existe dans Photos/post, Photos/profile ou Photos/bereal
+    const foldersToTry = ["Photos/post/", "Photos/profile/", "Photos/bereal/"];
+    
+    for (let folder of foldersToTry) {
+        if (fileMap[folder + fileName]) {
+            return URL.createObjectURL(fileMap[folder + fileName]);
+        }
     }
+
+    // 4. Cas particulier : chemin avec l'ID utilisateur au milieu (ton cas actuel)
+    // Photos/ID_USER/bereal/nom.webp -> Photos/bereal/nom.webp
+    if (cleanPath.includes('/bereal/')) {
+        const simplifiedBereal = "Photos/bereal/" + fileName;
+        if (fileMap[simplifiedBereal]) return URL.createObjectURL(fileMap[simplifiedBereal]);
+    }
+
+    console.warn("Fichier non trouvé dans l'archive :", cleanPath);
+    return "";
 }
+
 // #region 6. INITIALISATION & ASSETS
 let fileMap = {}; // Index pour retrouver les fichiers par leur nom
 
@@ -546,11 +723,12 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
     try {
         const userData = JSON.parse(await fileMap['user.json'].text());
         const memoriesData = JSON.parse(await fileMap['memories.json'].text());
+        const friendsData = JSON.parse(await fileMap['friends.json'].text());
         
         // On marque la session comme active dans le navigateur
         localStorage.setItem('bereal_session_active', 'true');
         
-        initApp(userData, memoriesData);
+        initApp(userData, memoriesData, friendsData);
         document.getElementById('upload-overlay').style.display = 'none';
     } catch (err) {
         alert("Dossier invalide.");
@@ -558,7 +736,7 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
 });
 
 // Nouvelle fonction de démarrage
-async function initApp(userData, memoriesData) {
+async function initApp(userData, memoriesData, friendsData) {
 
     // 1. Mise à jour du Profil (Textes et Image)
     const name = userData.username || "Utilisateur";
@@ -581,43 +759,41 @@ async function initApp(userData, memoriesData) {
     }
 
     // 2. Préparation des photos pour la carte (Features GeoJSON)
-    const momentCounts = {}; // Pour identifier le premier BeReal vs les Bonus
+    const momentCounts = {}; 
 
-    const features = memoriesData
-        .filter(m => m.location && m.location.longitude && m.location.latitude) // Évite le crash longitude
-        .map(m => {
-            // Logique pour déterminer si c'est un bonus
-            const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
-            const isBonus = !!momentCounts[momentId];
-            momentCounts[momentId] = true;
+    const features = memoriesData.map(m => {
+        // Logique pour déterminer si c'est un bonus
+        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
+        const isBonus = !!momentCounts[momentId];
+        momentCounts[momentId] = true;
 
-            return {
-                type: 'Feature',
-                geometry: { 
-                    type: 'Point', 
-                    coordinates: [m.location.longitude, m.location.latitude] 
-                },
-                properties: {
-                    // On transforme les chemins du JSON en URLs locales (Blob)
-                    front: getLocalUrl(m.frontImage.path),
-                    back: getLocalUrl(m.backImage.path),
-                    caption: m.caption || "",
-                    // Formatage de la date et l'heure pour la France
-                    date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                    time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                    rawDate: m.takenTime,
-                    isLate: m.isLate,
-                    isBonus: isBonus // Utilisé pour la bordure blanche (.on-time)
-                }
-            };
-        });
+        // GESTION DES COORDONNÉES : Si pas de location, on force à [0, 0]
+        const longitude = (m.location && m.location.longitude) ? m.location.longitude : 0;
+        const latitude = (m.location && m.location.latitude) ? m.location.latitude : 0;
 
+        return {
+            type: 'Feature',
+            geometry: { 
+                type: 'Point', 
+                coordinates: [longitude, latitude] 
+            },
+            properties: {
+                front: getLocalUrl(m.frontImage.path),
+                back: getLocalUrl(m.backImage.path),
+                caption: m.caption || "",
+                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                rawDate: m.takenTime,
+                isLate: m.isLate,
+                isBonus: isBonus
+            }
+        };
+    });
     // 3. Chargement de la Carte
     if (features.length > 0) {
         const injectFeatures = () => {
             if (!map.getSource('bereal-src')) {
                 setupMapLayers(features);
-                // AJOUTER CETTE LIGNE ICI :
                 watchZoomRadius(features); 
             }
         };
@@ -630,8 +806,7 @@ async function initApp(userData, memoriesData) {
     }
 
     // 4. Lancement des Statistiques (Pays, Départements, Streaks)
-    // On passe memoriesData en argument car calculateStats en a besoin
-    calculateStats(memoriesData);
+    calculateStats(memoriesData, userData, friendsData);
 }
 
 // #endregion
@@ -672,9 +847,10 @@ async function handleAutoLogin() {
 
             const userData = JSON.parse(await savedFiles['user.json'].text());
             const memoriesData = JSON.parse(await savedFiles['memories.json'].text());
+            const friendsData = JSON.parse(await savedFiles['friends.json'].text()); 
 
             const startApp = () => {
-                initApp(userData, memoriesData);
+                initApp(userData, memoriesData, friendsData);
                 loader.style.opacity = '0';
                 setTimeout(() => loader.style.display = 'none', 500);
             };
