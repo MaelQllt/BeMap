@@ -51,6 +51,18 @@ body {
     -webkit-transform: translateZ(0); /* Force un layer de compositing propre sur Safari */
     transition: border 0.3s ease, box-shadow 0.3s ease;
 }
+#photo-counter {
+    position: absolute;
+    top: 15px;
+    right: 20px;
+    color: rgba(255,255,255,0.5);
+    font-family: 'Inter', sans-serif; 
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    z-index: 10;
+    pointer-events: none;
+}
 
 /* --- ÉTAT ON-TIME (Bordure blanche épaisse) --- */
 .bereal-container.on-time {
@@ -689,125 +701,3 @@ body {
 .next-dash { right: -60px; }
 
 
-@media (max-width: 600px) {
-    /* On réduit la taille globale du Dashboard */
-    .dashboard-content {
-        width: 90%;
-        padding: 15px;
-        border-radius: 24px;
-    }
-
-    .dashboard-header {
-        margin-bottom: 15px;
-    }
-
-    .dashboard-title {
-        font-size: 20px;
-        margin-top: 0;
-    }
-
-    /* On réduit les cartes de stats pour gagner de la place */
-    .stat-card {
-        padding: 10px 5px;
-        border-radius: 18px;
-    }
-
-    .stat-value {
-        font-size: 24px !important;
-    }
-
-    .stat-label {
-        font-size: 8px;
-    }
-
-    .streak-card {
-        height: 70px;
-        padding: 0 15px;
-    }
-
-    .streak-value {
-        font-size: 26px !important;
-    }
-
-    /* Flèches du Dashboard : on les rend plus petites pour ne pas gêner */
-    .dash-nav {
-        width: 35px;
-        height: 35px;
-        background: rgba(255, 255, 255, 0.1);
-        top: 45%;
-    }
-    .prev-dash { left: -15px; } /* Légèrement décalées vers l'extérieur */
-    .next-dash { right: -15px; }
-
-    /* Bouton Logout : On le rend plus compact */
-    .logout-wrapper {
-        margin-top: 15px;
-    }
-    .logout-card-minimal {
-        padding: 6px 12px;
-    }
-}
-/* --- RESPONSIVE MODAL PHOTO --- */
-@media (max-width: 600px) {
-    .modal-content {
-        width: 92%;
-    }
-
-    .bereal-username {
-        font-size: 28px; /* Évite que les noms longs dépassent */
-    }
-
-    /* Cache les flèches latérales qui sortent de l'écran */
-    .nav-arrow.prev, .nav-arrow.next {
-        display: none !important; 
-    }
-
-    /* Optionnel: On peut ajouter des indicateurs de pagination discrets en bas */
-    .modal-content::after {
-        content: "Glissez pour naviguer";
-        font-size: 10px;
-        color: rgba(255,255,255,0.4);
-        margin-top: 10px;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-    }
-}
-
-@media (max-width: 600px) {
-    .user-profile-header {
-        top: 15px;
-        left: 15px;
-    }
-
-    .profile-pic-container {
-        width: 50px;
-        height: 50px;
-    }
-
-    #header-username {
-        font-size: 12px;
-    }
-}
-
-
-@media (max-width: 600px) {
-    /* On réaffiche les flèches mais à l'intérieur de l'image */
-    .nav-arrow {
-        display: flex !important;
-        position: absolute;
-        width: 40px;
-        height: 40px;
-        background: rgba(0, 0, 0, 0.3); /* Fond sombre pour contraste */
-        backdrop-filter: blur(5px);
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 1000;
-    }
-
-    .prev { left: 10px !important; } /* À l'intérieur à gauche */
-    .next { right: 10px !important; } /* À l'intérieur à droite */
-
-    .modal-content {
-        max-width: 100%;
-    }
-}

@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BeReal Map by Maaael</title>
-    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="icon" href="data:,">
     
     <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
@@ -14,8 +14,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
     
     <link rel="stylesheet" href="style.css">
-    <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 
 <body>
@@ -61,6 +59,7 @@
             </button>
 
             <div class="bereal-container" id="photo-container">
+                <div id="photo-counter">1/1</div>
                 <img id="main-photo" src="" class="main-img" alt="Main Photo">
                 <div id="mini-img-box" class="mini-img-container">
                     <img id="mini-photo" src="" class="mini-img" alt="Mini Photo">
@@ -133,12 +132,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="logout-wrapper" onclick="clearSession()">
-                <div class="logout-card-minimal">
-                    <span class="logout-label-minimal">Se déconnecter / Changer d'archive</span>
-                </div>
-            </div>
     </div>
 
     <script src="script.js"></script>

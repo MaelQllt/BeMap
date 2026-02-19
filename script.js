@@ -149,105 +149,6 @@ badge.addEventListener('mousedown', (e) => {
 });
 
 
-// Fonction universelle pour débuter le drag
-function startDragging(e) {
-    isDragging = true; 
-    hasDragged = false;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    const rect = miniBox.getBoundingClientRect();
-    const cRect = container.getBoundingClientRect();
-    
-    dragStartX = clientX - (rect.left - cRect.left);
-    dragStartY = clientY - (rect.top - cRect.top);
-    
-    miniBox.style.transition = 'none';
-    if (!e.touches) e.preventDefault(); 
-    e.stopPropagation();
-}
-
-// Fonction universelle pour le mouvement
-function moveDragging(e) {
-    if (!isDragging) return;
-    hasDragged = true;
-    
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    const clampedX = Math.max(10, Math.min(clientX - dragStartX, container.offsetWidth - miniBox.offsetWidth - 10));
-    const clampedY = Math.max(10, Math.min(clientY - dragStartY, container.offsetHeight - miniBox.offsetHeight - 10));
-    
-    miniBox.style.transform = `translate(${clampedX - 14}px, ${clampedY - 14}px)`;
-    
-    if (e.touches) e.preventDefault(); // Empêche le défilement de la page pendant qu'on drag
-}
-
-// Événements Souris
-miniBox.addEventListener('mousedown', startDragging);
-document.addEventListener('mousemove', (e) => {
-    moveDragging(e);
-    if (isZooming) handlePan(e.clientX, e.clientY);
-});
-
-// Événements Tactiles (iPhone)
-miniBox.addEventListener('touchstart', startDragging, {passive: false});
-document.addEventListener('touchmove', (e) => {
-    moveDragging(e);
-    if (isZooming) {
-        const x = e.touches[0].clientX;
-        const y = e.touches[0].clientY;
-        handlePan(x, y);
-    }
-}, {passive: false});
-
-// Zoom au toucher
-photoContainer.addEventListener('touchstart', (e) => {
-    if (!e.target.closest('.mini-img-container')) {
-        const x = e.touches[0].clientX;
-        const y = e.touches[0].clientY;
-        startZoom(x, y);
-    }
-}, {passive: true});
-
-// Fin du drag ou zoom
-const endInteraction = () => {
-    if (isDragging) {
-        isDragging = false;
-        if (!hasDragged) {
-            // Logique du Flip (inverser les photos)
-            isFlipped = !isFlipped;
-            const p = currentPhotos[currentIndex];
-            mainPhoto.src = isFlipped ? p.front : p.back;
-            document.getElementById('mini-photo').src = isFlipped ? p.back : p.front;
-        } else {
-            // Logique du Snap (aimanter à gauche ou à droite)
-            justFinishedDrag = true;
-            miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (container.getBoundingClientRect().left + container.offsetWidth/2);
-            currentMiniSide = snapRight ? 'right' : 'left'; 
-            miniBox.style.transform = snapRight ? `translate(${container.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
-            setTimeout(() => justFinishedDrag = false, 500);
-        }
-    }
-    if (isZooming) {
-        justFinishedDrag = true;
-        resetZoomState();
-        setTimeout(() => justFinishedDrag = false, 300);
-    }
-};
-
-document.addEventListener('mouseup', endInteraction);
-document.addEventListener('touchend', endInteraction);
-// Événements Tactiles
-badge.addEventListener('touchstart', (e) => {
-    isDraggingBadge = true;
-    hasMovedBadge = false;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    mouseX = e.touches[0].clientX;
-    mouseY = e.touches[0].clientY;
-}, {passive: false});
 
 document.addEventListener('mousemove', (e) => {
     if (!isDraggingBadge) return;
@@ -256,17 +157,10 @@ document.addEventListener('mousemove', (e) => {
     targetY = e.clientY - mouseY;
 });
 
-document.addEventListener('touchmove', (e) => {
-    if (!isDraggingBadge) return;
-    if (Math.abs(e.touches[0].clientX - startX) > 5 || Math.abs(e.touches[0].clientY - startY) > 5) hasMovedBadge = true;
-    targetX = e.touches[0].clientX - mouseX;
-    targetY = e.touches[0].clientY - mouseY;
-    e.preventDefault();
-}, {passive: false});
+
 
 const stopBadgeDrag = () => { isDraggingBadge = false; targetX = 0; targetY = 0; };
 document.addEventListener('mouseup', stopBadgeDrag);
-document.addEventListener('touchend', stopBadgeDrag);
 
 badge.addEventListener('click', () => {
     if (!hasMovedBadge) openDashboard();
@@ -671,6 +565,10 @@ function updateModalContent() {
 
     document.getElementById('prevBtn').style.display = (currentPhotos.length > 1 && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (currentPhotos.length > 1 && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
+    const counter = document.getElementById('photo-counter');
+    if (counter) {
+        counter.innerText = currentPhotos.length > 1 ? `${currentIndex + 1}/${currentPhotos.length}` : '';
+    }
 }
 
 function closeModal() {
@@ -788,28 +686,7 @@ function getLocalUrl(jsonPath) {
     console.warn("Fichier non trouvé dans l'archive :", cleanPath);
     return "";
 }
-// Ajout du support Swipe pour Mobile
-let touchStartX = 0;
-let touchEndX = 0;
 
-modal.addEventListener('touchstart', e => {
-    touchStartX = e.changedTouches[0].screenX;
-}, {passive: true});
-
-modal.addEventListener('touchend', e => {
-    touchEndX = e.changedTouches[0].screenX;
-    handleSwipe();
-}, {passive: true});
-
-function handleSwipe() {
-    const swipeThreshold = 50; // distance min en pixels
-    if (touchEndX < touchStartX - swipeThreshold) {
-        nextPhoto(); // Swipe gauche -> Suivant
-    }
-    if (touchEndX > touchStartX + swipeThreshold) {
-        prevPhoto(); // Swipe droite -> Précédent
-    }
-}
 // #region 6. INITIALISATION & ASSETS
 let fileMap = {}; // Index pour retrouver les fichiers par leur nom
 
@@ -937,6 +814,27 @@ function prevPhoto() {
         updateModalContent();
     }
 }
+
+document.addEventListener('keydown', (e) => {
+    // Bloquer le scroll de la carte dans tous les cas
+    if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.preventDefault();
+    }
+
+    // Navigation dans la modale photo
+    if (modal.style.display === 'flex') {
+        if (e.key === 'ArrowRight') nextPhoto();
+        if (e.key === 'ArrowLeft') prevPhoto();
+        if (e.key === 'Escape') closeModal();
+    }
+
+    // Navigation dans le dashboard
+    const dash = document.getElementById('dashboard-modal');
+    if (dash && dash.style.display === 'flex') {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') switchDash();
+        if (e.key === 'Escape') closeDashboard();
+    }
+});
 
 
 /**
