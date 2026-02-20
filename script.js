@@ -414,6 +414,8 @@ function openDashboard() {
     }
 
     if (cachedStats) updateDashboardUI();
+
+    updateNorthBtnVisibility();
 }
 
 /**
@@ -435,6 +437,8 @@ function closeDashboard() {
         badge.style.opacity = '1';
         badge.style.pointerEvents = 'auto';
     }
+
+    updateNorthBtnVisibility();
 }
 
 // #endregion
@@ -446,8 +450,7 @@ const map = new maplibregl.Map({
     center: [2.21, 46.22], 
     zoom: 5.5, 
     maxZoom: 17
-});4
-map.on('zoom', () => {
+    
 });
 
 
@@ -562,6 +565,37 @@ function reAddLayers() {
     map.addLayer({ id: 'clusters', type: 'circle', source: 'bereal-src', filter: ['has', 'point_count'], paint: { 'circle-color': '#151517', 'circle-radius': 18, 'circle-stroke-width': 1, 'circle-stroke-color': '#d9d9d960' } });
     map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-opacity': 0, 'circle-radius': 15 } });
 }
+const northBtn = document.getElementById('north-button');
+
+// Fonction pour vérifier la visibilité du bouton Nord
+function updateNorthBtnVisibility() {
+    const bearing = map.getBearing();
+    const isMapModified = Math.abs(bearing) > 0.5;
+    
+    // On ne l'affiche que si la carte a bougé ET que les modales sont fermées
+    const isDashboardOpen = document.getElementById('dashboard-modal').style.display === 'flex';
+    const isPhotoOpen = document.getElementById('bereal-modal').style.display === 'flex';
+
+    if (isMapModified && !isDashboardOpen && !isPhotoOpen) {
+        northBtn.classList.add('visible');
+        northBtn.querySelector('svg').style.transform = `rotate(${-bearing}deg)`;
+    } else {
+        northBtn.classList.remove('visible');
+    }
+}
+
+// Écouteurs MapLibre
+map.on('rotate', updateNorthBtnVisibility);
+map.on('move', updateNorthBtnVisibility);
+
+// Reset au clic
+northBtn.addEventListener('click', () => {
+    map.easeTo({
+        bearing: 0,
+        duration: 800
+    });
+});
+
 // #endregion
 
 
@@ -584,6 +618,8 @@ function openModal(photos) {
     // Correction aussi pour le badge (évite le += qui peut bugger)
     badge.style.filter = 'blur(3px)';
     badge.style.pointerEvents = 'none';
+
+    updateNorthBtnVisibility();
 }
 
 function updateModalContent() {
@@ -630,6 +666,8 @@ function closeModal() {
 
     badge.style.filter = 'none';
     badge.style.pointerEvents = 'auto';
+
+    updateNorthBtnVisibility();
 }
 
 // --- LOGIQUE PHOTO (DRAG & FLIP) ---
