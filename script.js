@@ -444,14 +444,76 @@ function closeDashboard() {
 // #endregion
 
 // #region 4. GESTION DE LA CARTE (MapLibre)
+
+// --- CONFIGURATION DE LA CARTE ---
 const map = new maplibregl.Map({
     container: 'map',
     style: 'https://api.maptiler.com/maps/dataviz-dark/style.json?key=iYlIQdqzuS2kKjZemTWi',
     center: [2.21, 46.22], 
     zoom: 5.5, 
-    maxZoom: 17
-    
+    maxZoom: 17,
+    pitch: 0, 
+    antialias: true
 });
+
+// --- GESTION DES BÂTIMENTS 3D ---
+function setup3DBuildings() {
+    // On détecte dynamiquement la source du style (MapTiler change souvent le nom)
+    const sourceId = map.getSource('openmaptiles') ? 'openmaptiles' : 'maptiler_planet';
+    
+    if (!map.getLayer('3d-buildings')) {
+        map.addLayer({
+            'id': '3d-buildings',
+            'source': sourceId,
+            'source-layer': 'building',
+            'type': 'fill-extrusion',
+            'minzoom': 15,
+            'paint': {
+                'fill-extrusion-color': '#2a2a2b',
+                'fill-extrusion-height': [
+                    'coalesce', 
+                    ['get', 'render_height'], 
+                    ['get', 'height'], 
+                    20 
+                ],
+                'fill-extrusion-base': [
+                    'coalesce', 
+                    ['get', 'render_min_height'], 
+                    ['get', 'min_height'], 
+                    0
+                ],
+                'fill-extrusion-opacity': 0, // Caché par défaut
+                'fill-extrusion-opacity-transition': { duration: 500 } // Transition fluide
+            }
+        });
+    }
+}
+
+// --- LOGIQUE D'AFFICHAGE DYNAMIQUE (PITCH/ZOOM) ---
+function update3DVisibility() {
+    if (!map.getLayer('3d-buildings')) return;
+
+    const pitch = map.getPitch();
+    const zoom = map.getZoom();
+    
+    // On montre la 3D seulement si incliné (>10°) ET zoomé (>13)
+    const shouldShow = pitch > 25 && zoom > 15;
+    const targetOpacity = shouldShow ? 0.8 : 0;
+
+    // On ne met à jour que si nécessaire pour les performances
+    const currentOpacity = map.getPaintProperty('3d-buildings', 'fill-extrusion-opacity');
+    if (currentOpacity !== targetOpacity) {
+        map.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', targetOpacity);
+    }
+}
+
+// --- ÉVÉNEMENTS ---
+map.on('style.load', () => {
+    setup3DBuildings();
+});
+
+// Un seul listener "move" suffit pour gérer zoom ET rotation ET inclinaison
+map.on('move', update3DVisibility);
 
 
 
@@ -902,6 +964,8 @@ async function initApp(userData, memoriesData, friendsData) {
         window.dispatchEvent(new Event('resize'));
         map.resize();
     }, 300);
+
+    setup3DBuildings();
 }
 
 // #endregion
