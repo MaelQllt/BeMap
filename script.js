@@ -114,6 +114,11 @@ let lastMouseX, lastMouseY;
 let cachedStats = null;
 let clusterMarkers = {};
 
+// Variables de reposition
+let isRelocating = false;
+let memoryToUpdate = null;
+let allMemoriesData = []; // Pour garder une trace de toutes les données chargées
+
 // #endregion
 
 
@@ -439,6 +444,60 @@ function closeDashboard() {
 
 // #endregion
 
+function refreshMapMarkers(data) {
+    const momentCounts = {}; 
+    const features = data.map(m => {
+        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
+        const isBonus = !!momentCounts[momentId];
+        momentCounts[momentId] = true;
+
+        const longitude = (m.location && m.location.longitude) ? m.location.longitude : 0;
+        const latitude = (m.location && m.location.latitude) ? m.location.latitude : 0;
+
+        return {
+            type: 'Feature',
+            geometry: { type: 'Point', coordinates: [longitude, latitude] },
+            properties: {
+                front: getLocalUrl(m.frontImage.path),
+                back: getLocalUrl(m.backImage.path),
+                caption: m.caption || "",
+                location: m.location,
+                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                rawDate: m.takenTime,
+                isLate: m.isLate,
+                isBonus: isBonus
+            }
+        };
+    });
+
+    if (map.getSource('bereal-src')) {
+        map.getSource('bereal-src').setData({ type: 'FeatureCollection', features });
+    } else {
+        setupMapLayers(features);
+        watchZoomRadius(features);
+    }
+}
+
+
+document.getElementById('export-json-btn').addEventListener('click', (e) => {
+    e.stopPropagation(); // Empêche de fermer le dashboard
+    
+    if (!allMemoriesData || allMemoriesData.length === 0) return;
+
+    const dataStr = JSON.stringify(allMemoriesData, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "memories.json";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+});
+
 // #region 4. GESTION DE LA CARTE (MapLibre)
 
 // --- CONFIGURATION DE LA CARTE ---
@@ -705,6 +764,32 @@ pitchBtn.addEventListener('click', () => {
     map.easeTo({ pitch: 0, duration: 800 });
 });
 
+
+map.on('click', async (e) => {
+    if (!isRelocating || !memoryToUpdate) return;
+
+    const { lng, lat } = e.lngLat;
+
+    const index = allMemoriesData.findIndex(m => m.takenTime === memoryToUpdate.rawDate);
+    
+    if (index !== -1) {
+        allMemoriesData[index].location = { latitude: lat, longitude: lng };
+
+        const updatedJsonBlob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
+        await saveFileToSession("memories.json", updatedJsonBlob);
+
+        refreshMapMarkers(allMemoriesData);
+
+        // --- AJOUT : Faire apparaître le bouton de téléchargement ---
+        const exportBtn = document.getElementById('export-json-btn');
+        if (exportBtn) exportBtn.style.display = 'inline-flex'; 
+
+        isRelocating = false;
+        document.getElementById('map').style.cursor = '';
+        alert("Position mise à jour !");
+    }
+});
+
 // #endregion
 
 
@@ -905,6 +990,19 @@ function handlePan(x, y) {
 }
 
 photoContainer.addEventListener('mousedown', (e) => { if (!e.target.closest('.mini-img-container')) startZoom(e.clientX, e.clientY); });
+
+document.getElementById('replace-button').addEventListener('click', () => {
+    // currentPhotos[currentIndex] contient l'objet memory actuel
+    memoryToUpdate = currentPhotos[currentIndex]; 
+    isRelocating = true;
+    
+    closeModal(); // Ferme la modale pour voir la carte
+    document.getElementById('map').style.cursor = 'crosshair';
+    
+    // Notification visuelle (optionnel)
+    console.log("Mode repositionnement activé pour :", memoryToUpdate);
+});
+
 // #endregion
 
 
@@ -1127,6 +1225,7 @@ async function handleAutoLogin() {
 
             const userData = JSON.parse(await savedFiles['user.json'].text());
             const memoriesData = JSON.parse(await savedFiles['memories.json'].text());
+            allMemoriesData = memoriesData; // On stocke pour pouvoir le modifier plus tard
             const friendsData = JSON.parse(await savedFiles['friends.json'].text()); 
 
             const startApp = () => {

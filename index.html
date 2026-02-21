@@ -160,8 +160,12 @@
                 </div>
             </div>
 
-            <div class="logout-wrapper" onclick="handleLogout(event)">
-                <div class="logout-card-minimal">
+            <div class="logout-wrapper">
+                <div id="export-json-btn" class="logout-card-minimal" style="display: none; margin-right: 10px; background: rgba(255, 255, 255, 0.05);">
+                    <span class="logout-label-minimal">Exporter .json</span>
+                </div>
+
+                <div class="logout-card-minimal" onclick="handleLogout(event)">
                     <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
                 </div>
             </div>

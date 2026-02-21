@@ -352,20 +352,21 @@
 /* #endregion 4 */
 
 
-/* #region 5 LOGOUT BTN */
+/* #region 5 LOGOUT & EXPORT BTNS */
 
-/* Le wrapper devient la zone de détection (Hitbox fixe) */
 .logout-wrapper {
     display: flex;
     justify-content: center;
-    width: fit-content;
+    align-items: center;
+    gap: 10px; /* Espace entre l'export et le logout */
+    width: 100%;
     margin: 0 auto;
-    padding: 15px 0px; /* Crée une zone de confort autour du bouton */
+    padding: 15px 0px;
     animation: fadeIn 0.8s ease-out;
-    cursor: pointer;
 }
 
-.logout-card-minimal {
+/* Style commun pour les deux boutons minimaux */
+.logout-card-minimal, #export-json-btn {
     background: rgba(0, 0, 0, 0.4); 
     padding: 8px 18px; 
     border-radius: 20px;
@@ -375,35 +376,10 @@
     align-items: center;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
-    pointer-events: none; /* Le bouton ignore la souris, c'est le wrapper qui gère tout */
+    cursor: pointer;
 }
 
-/* QUAND ON SURVOLE LE WRAPPER (qui est fixe), ON FAIT BOUGER LA CARTE */
-.logout-wrapper:hover .logout-card-minimal {
-    background: rgba(255, 68, 68, 0.1); 
-    border-color: rgba(255, 68, 68, 0.3);
-    transform: translateY(-3px); 
-}
-
-/* On applique aussi les changements de texte via le wrapper */
-.logout-wrapper:hover .logout-label-minimal {
-    color: #fb3c30;
-    font-weight: 400;
-    transform: scale(1.02);
-}
-
-/* Effet au clic sur le wrapper */
-.logout-wrapper:active .logout-card-minimal {
-    transform: scale(0.95);
-}
-
-.logout-card-minimal:hover {
-    background: rgba(255, 68, 68, 0.1); 
-    border-color: rgba(255, 68, 68, 0.3);
-    /* Le mouvement est fluide et ne causera plus de tremblement */
-    transform: translateY(-3px); 
-}
-
+/* État de base du label */
 .logout-label-minimal {
     font-size: 10px; 
     font-weight: 300; 
@@ -413,16 +389,28 @@
     transition: all 0.3s ease;
 }
 
-
-
-.logout-card-minimal:hover .logout-label-minimal {
-    color: #ff6666; /* Le texte s'éclaire en rouge */
-    font-weight: 400;
-    transform: scale(1.02);
+/* HOVER EXPORT (Bleu discret ou blanc) */
+#export-json-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-3px);
+}
+#export-json-btn:hover .logout-label-minimal {
+    color: #fff;
 }
 
-/* Effet au clic */
-.logout-card-minimal:active {
+/* HOVER LOGOUT (Rouge discret) */
+.logout-wrapper .logout-card-minimal:last-child:hover {
+    background: rgba(255, 68, 68, 0.1); 
+    border-color: rgba(255, 68, 68, 0.3);
+    transform: translateY(-3px); 
+}
+.logout-wrapper .logout-card-minimal:last-child:hover .logout-label-minimal {
+    color: #fb3c30;
+}
+
+/* Effet clic */
+.logout-card-minimal:active, #export-json-btn:active {
     transform: scale(0.95);
 }
 
