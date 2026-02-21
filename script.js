@@ -23,8 +23,6 @@ const DB_NAME = "BeRealMapDB";
 const STORE_NAME = "files";
 
 
-document.getElementById('upload-overlay').style.display = 'flex';
-
 // Initialise la connexion à la base de données
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -79,23 +77,13 @@ async function loadSessionFiles() {
     });
 }
 
-// Fonction pour se déconnecter
-async function clearSession() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    tx.objectStore(STORE_NAME).clear();
-    tx.oncomplete = () => {
-        localStorage.removeItem('bereal_session_active');
-        location.reload();
-    };
-}
+
+
 // #region 1. CONFIGURATION & ÉTAT GLOBAL
-const FOLDER_NAME = "AF9TaX9kF2Ph70UyFt19wuMJvqr2-pGvnrPTVROrjNoqlXt1pl";
 
 // Sélecteurs DOM
 const usernameDisplay = document.querySelector('.bereal-username');
 const miniBox = document.getElementById('mini-img-box');
-const container = document.getElementById('photo-container');
 const mainPhoto = document.getElementById('main-photo');
 const photoContainer = document.getElementById('photo-container');
 const modal = document.getElementById('bereal-modal');
@@ -122,6 +110,7 @@ let allMemoriesData = []; // Pour garder une trace de toutes les données charg�
 // Variables GeoJSON
 let worldGeoCache = null;
 let depsGeoCache = null;
+let isUiLocked = false;
 
 // #endregion
 
@@ -229,6 +218,10 @@ function switchDash(direction = 'right') {
  * @param {Array} friendsData - Contenu de friends.json
  */
 async function calculateStats(data, userData, friendsData) {
+    if (cachedStats && cachedStats.total === data.length) {
+        updateDashboardUI();
+        return;
+    }
     try {
         // --- 1. CALCUL DE LA STREAK ---
         const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
@@ -401,26 +394,14 @@ function updateDashboardUI() {
  * Ouvre le dashboard avec les effets visuels sur la carte
  */
 function openDashboard() {
-    // 1. On récupère les DEUX éléments (l'overlay et le contenu)
-    const modal = document.getElementById('dashboard-modal');
+    const dashModal = document.getElementById('dashboard-modal');
     const content = document.querySelector('.dashboard-positioner');
-    const mapEl = document.getElementById('map');
-    const badge = document.querySelector('.user-profile-header');
 
-    // 2. On affiche l'overlay ET on force le contenu en flex
-    if (modal) modal.style.display = 'flex';
+    if (dashModal) dashModal.style.display = 'flex';
     if (content) content.style.display = 'flex';
     
-    // 3. Effets sur la carte
-    if (mapEl) {
-        mapEl.style.transform = 'scale(1.05)';
-        mapEl.style.filter = 'blur(3px) brightness(0.4)';
-    }
-
-    if (badge) {
-        badge.style.opacity = '0';
-        badge.style.pointerEvents = 'none';
-    }
+    // Remplace les lignes manuelles par :
+    setMapFocus(true);
 
     if (cachedStats) updateDashboardUI();
 }
@@ -429,64 +410,49 @@ function openDashboard() {
  * Ferme le dashboard et restaure l'état de la carte
  */
 function closeDashboard() {
-    const modal = document.getElementById('dashboard-modal');
+    const dashModal = document.getElementById('dashboard-modal');
     const content = document.querySelector('.dashboard-positioner');
-    const mapEl = document.getElementById('map');
-    const badge = document.querySelector('.user-profile-header');
 
-    if (modal) modal.style.display = 'none';
+    if (dashModal) dashModal.style.display = 'none';
     if (content) content.style.display = 'none';
     
-    if (mapEl) {
-        mapEl.style.transform = 'scale(1)'; // On reset le scale
-        mapEl.style.filter = 'none';        // On reset le flou
-    }
-
-    if (badge) {
-        badge.style.opacity = '1';
-        badge.style.pointerEvents = 'auto';
-    }
-
-    
+    // Remplace les lignes manuelles par :
+    setMapFocus(false);
 }
 
 // #endregion
 
 function refreshMapMarkers(data) {
-    const momentCounts = {}; 
-    const features = data.map(m => {
-        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
-        const isBonus = !!momentCounts[momentId];
-        momentCounts[momentId] = true;
+    // 1. Nettoyage
+    if (clusterMarkers) {
+        Object.values(clusterMarkers).forEach(m => m.remove());
+        clusterMarkers = {};
+    }
 
-        const longitude = (m.location && m.location.longitude) ? m.location.longitude : 0;
-        const latitude = (m.location && m.location.latitude) ? m.location.latitude : 0;
+    // 2. Utilisation de la fonction centralisée
+    const newFeatures = convertMemoriesToGeoJSON(data);
 
-        return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [longitude, latitude] },
-            properties: {
-                front: getLocalUrl(m.frontImage.path),
-                back: getLocalUrl(m.backImage.path),
-                caption: m.caption || "",
-                location: m.location,
-                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                rawDate: m.takenTime,
-                isLate: m.isLate,
-                isBonus: isBonus
-            }
-        };
+    // 3. Remplacement dans la source MapLibre
+    if (map.getSource('bereal-src')) {
+        if (map.getLayer('clusters')) map.removeLayer('clusters');
+        if (map.getLayer('unclustered-point')) map.removeLayer('unclustered-point');
+        map.removeSource('bereal-src');
+    }
+
+    map.addSource('bereal-src', {
+        type: 'geojson',
+        data: { 
+            type: 'FeatureCollection', 
+            features: JSON.parse(JSON.stringify(newFeatures)) 
+        },
+        cluster: true,
+        clusterMaxZoom: 22,
+        clusterRadius: currentRadiusMode
     });
 
-    if (map.getSource('bereal-src')) {
-        map.getSource('bereal-src').setData({ type: 'FeatureCollection', features });
-    } else {
-        setupMapLayers(features);
-        watchZoomRadius(features);
-    }
+    reAddLayers();
+    map.triggerRepaint();
 }
-
 
 document.getElementById('export-json-btn').addEventListener('click', (e) => {
     e.stopPropagation(); // Empêche de fermer le dashboard
@@ -578,7 +544,31 @@ map.on('style.load', () => {
 // Un seul listener "move" suffit pour gérer zoom ET rotation ET inclinaison
 map.on('move', update3DVisibility);
 
-
+function setMapFocus(isFocus) {
+    isUiLocked = isFocus; // On verrouille si une modale s'ouvre
+    
+    const mapEl = document.getElementById('map');
+    const badge = document.querySelector('.user-profile-header');
+    const controls = [northBtn, pitchBtn];
+    
+    if (isFocus) {
+        mapEl.style.transform = 'scale(1.05)';
+        mapEl.style.filter = 'blur(5px) brightness(0.4)';
+        badge.style.filter = 'blur(3px)';
+        badge.style.pointerEvents = 'none';
+        
+        // Cache les boutons immédiatement
+        controls.forEach(btn => btn?.classList.remove('visible'));
+    } else {
+        mapEl.style.transform = 'scale(1)';
+        mapEl.style.filter = 'none';
+        badge.style.filter = 'none';
+        badge.style.pointerEvents = 'auto';
+        
+        // On demande la mise à jour des boutons
+        updateMapControls();
+    }
+}
 
 let currentRadiusMode = 60;
 
@@ -590,29 +580,11 @@ function watchZoomRadius(features) {
 
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
-            updateMapSource(features, newRadius);
+            refreshMapMarkers(allMemoriesData);
         }
     });
 }
-function updateMapSource(features, radius) {
-    if (!map.getSource('bereal-src')) return;
 
-    // Suppression propre des layers
-    if (map.getLayer('clusters')) map.removeLayer('clusters');
-    if (map.getLayer('unclustered-point')) map.removeLayer('unclustered-point');
-
-    map.removeSource('bereal-src');
-
-    map.addSource('bereal-src', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features },
-        cluster: true,
-        clusterMaxZoom: 22, 
-        clusterRadius: radius 
-    });
-
-    reAddLayers();
-}
 
 function setupMapLayers(features) {
     if (map.getSource('bereal-src')) return;
@@ -724,32 +696,31 @@ function getPitchArcPath(pitch) {
  * Met à jour l'état visuel des boutons de contrôle
  */
 function updateMapControls() {
+    // Si l'UI est verrouillée, on ne touche à rien
+    if (isUiLocked) return; 
+
     const bearing = map.getBearing();
     const pitch = map.getPitch(); 
     
-    // Seuils de visibilité
     const isRotated = Math.abs(bearing) > 0.5;
     const isPitched = pitch > 0.5;
 
-    // État de l'interface
-    const isDashboardOpen = document.querySelector('.dashboard-positioner')?.style.display === 'flex';
-    const isPhotoOpen = photoModal.style.display === 'flex';
-    const canShow = !isDashboardOpen && !isPhotoOpen;
-
-    // --- GESTION DU BOUTON PITCH ---
-    if (canShow && isPitched) {
+    // Logique PITCH (Inclinaison)
+    if (isPitched) {
         pitchBtn.classList.add('visible');
-        if (pitchLine && pitchArc) {
-            pitchLine.style.transformOrigin = "7px 17px";
+        if (pitchLine) {
+            pitchLine.style.transformOrigin = "7px 17px"; // Le pivot
             pitchLine.style.transform = `rotate(${-pitch}deg)`;
+        }
+        if (pitchArc) {
             pitchArc.setAttribute('d', getPitchArcPath(pitch));
         }
     } else {
         pitchBtn.classList.remove('visible');
     }
 
-    // --- GESTION DE LA BOUSSOLE ---
-    if (canShow && isRotated) {
+    // Logique NORD (Boussole)
+    if (isRotated) {
         northBtn.classList.add('visible');
         northIcon.style.transform = `rotate(${-bearing}deg)`;
     } else {
@@ -782,6 +753,7 @@ map.on('click', async (e) => {
     if (index !== -1) {
         // 1. Mise à jour de la position
         allMemoriesData[index].location = { latitude: lat, longitude: lng };
+        console.log("Nouvelle position enregistrée :", allMemoriesData[index].location);
 
         // 2. Sauvegarde dans IndexedDB
         const updatedJsonBlob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
@@ -826,16 +798,7 @@ function openModal(photos) {
     
     modal.style.display = 'flex';
 
-    // On modifie les propriétés une par une pour NE PAS toucher au height
-    const mapEl = document.getElementById('map');
-    mapEl.style.transform = 'scale(1.1)';
-    mapEl.style.filter = 'blur(3px) brightness(0.4)';
-
-    // Correction aussi pour le badge (évite le += qui peut bugger)
-    badge.style.filter = 'blur(3px)';
-    badge.style.pointerEvents = 'none';
-
-    
+    setMapFocus(true);
 }
 
 function updateModalContent() {
@@ -845,40 +808,37 @@ function updateModalContent() {
     if (replaceBtn) replaceBtn.style.setProperty('display', 'none', 'important');
     if (!p) return;
 
-    // Normalisation de la localisation (String -> Object)
+    // 1. Normalisation de la localisation (Optimisé)
     let loc = p.location;
-    if (typeof loc === 'string' && loc.trim() !== "") {
-        try {
-            loc = JSON.parse(loc);
-        } catch (e) {
-            loc = null;
-        }
+    if (typeof loc === 'string') {
+        try { loc = JSON.parse(loc); } catch (e) { loc = null; }
     }
 
-    // Réinitialisation de l'état visuel
+    // 2. Réinitialisation de l'état visuel
     isFlipped = false; 
     resetZoomState();
 
-    // Mise à jour des médias et textes
+    // 3. Mise à jour des médias et textes
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption || "";
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
     
-    container.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
+    photoContainer.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
     
-    // Affichage du bouton "Replacer" si la localisation est invalide
-    const hasValidLocation = loc && loc.latitude && loc.longitude;
-    if (replaceBtn && !hasValidLocation) {
-        replaceBtn.style.setProperty('display', 'block', 'important');
+    // 4. Affichage intelligent du bouton "Replacer"
+    const hasValidLocation = loc && loc.latitude && loc.longitude && loc.latitude !== 0;
+    if (replaceBtn) {
+        replaceBtn.style.display = hasValidLocation ? 'none' : 'block';
     }
 
-    // Positionnement de la miniature
-    miniBox.style.transition = 'none';
-    const xPos = currentMiniSide === 'right' ? (container.offsetWidth - miniBox.offsetWidth - 28) : 0;
+    // 5. Positionnement de la miniature (Avec transition fluide)
+    // On active la transition pour que le passage gauche/droite soit esthétique
+    miniBox.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'; 
+    const xPos = currentMiniSide === 'right' ? (photoContainer.offsetWidth - miniBox.offsetWidth - 28) : 0;
     miniBox.style.transform = `translate(${xPos}px, 0px)`;
 
-    // Gestion de la navigation
+    // 6. Gestion de la navigation
     const hasMultiple = currentPhotos.length > 1;
     document.getElementById('prevBtn').style.display = (hasMultiple && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (hasMultiple && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
@@ -892,25 +852,25 @@ function updateModalContent() {
 function closeModal() {
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
+
+    currentMiniSide = 'left';
+    const counter = document.getElementById('photo-counter');
+    if (counter) {
+        counter.style.left = 'auto';
+        counter.style.right = '20px';
+        counter.classList.remove('switching', 'from-left');
+    }
     
-    // AU LIEU DE cssText, on modifie uniquement les propriétés de transformation
-    const mapEl = document.getElementById('map');
-    mapEl.style.transform = 'scale(1)';
-    mapEl.style.filter = 'none';
+    // Remplace les lignes manuelles par :
+    setMapFocus(false);
     
-    // On relance un petit resize de sécurité
     syncPWAHeight();
-
-    badge.style.filter = 'none';
-    badge.style.pointerEvents = 'auto';
-
-    
 }
 
 // --- LOGIQUE PHOTO (DRAG & FLIP) ---
 miniBox.addEventListener('mousedown', (e) => {
     isDragging = true; hasDragged = false;
-    const rect = miniBox.getBoundingClientRect(), cRect = container.getBoundingClientRect();
+    const rect = miniBox.getBoundingClientRect(), cRect = photoContainer.getBoundingClientRect();
     dragStartX = e.clientX - (rect.left - cRect.left);
     dragStartY = e.clientY - (rect.top - cRect.top);
     miniBox.style.transition = 'none';
@@ -920,8 +880,8 @@ miniBox.addEventListener('mousedown', (e) => {
 document.addEventListener('mousemove', (e) => {
     if (isDragging) {
         hasDragged = true;
-        const clampedX = Math.max(10, Math.min(e.clientX - dragStartX, container.offsetWidth - miniBox.offsetWidth - 10));
-        const clampedY = Math.max(10, Math.min(e.clientY - dragStartY, container.offsetHeight - miniBox.offsetHeight - 10));
+        const clampedX = Math.max(10, Math.min(e.clientX - dragStartX, photoContainer.offsetWidth - miniBox.offsetWidth - 10));
+        const clampedY = Math.max(10, Math.min(e.clientY - dragStartY, photoContainer.offsetHeight - miniBox.offsetHeight - 10));
         miniBox.style.transform = `translate(${clampedX - 14}px, ${clampedY - 14}px)`;
     }
     if (isZooming) handlePan(e.clientX, e.clientY);
@@ -941,9 +901,9 @@ document.addEventListener('mouseup', () => {
             justFinishedDrag = true;
             miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             
-            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (container.getBoundingClientRect().left + container.offsetWidth/2);
+            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (photoContainer.getBoundingClientRect().left + photoContainer.offsetWidth/2);
             currentMiniSide = snapRight ? 'right' : 'left'; 
-            miniBox.style.transform = snapRight ? `translate(${container.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
+            miniBox.style.transform = snapRight ? `translate(${photoContainer.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
 
             // --- ANIMATION DU COMPTEUR (À L'OPPOSÉ DE LA MINIATURE) ---
             const counter = document.getElementById('photo-counter');
@@ -982,7 +942,7 @@ document.addEventListener('mouseup', () => {
 
 // --- LOGIQUE ZOOM ---
 function updateTransform() {
-    const maxTx = (container.offsetWidth * (zoomScale - 1)) / 2, maxTy = (container.offsetHeight * (zoomScale - 1)) / 2;
+    const maxTx = (photoContainer.offsetWidth * (zoomScale - 1)) / 2, maxTy = (photoContainer.offsetHeight * (zoomScale - 1)) / 2;
     translateX = Math.max(-maxTx/zoomScale, Math.min(translateX, maxTx/zoomScale));
     translateY = Math.max(-maxTy/zoomScale, Math.min(translateY, maxTy/zoomScale));
     mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
@@ -1090,20 +1050,19 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
 
     try {
         const memoriesFile = fileMap['memories.json'];
-        await saveFileToSession("memories_original.json", memoriesFile); // On crée le témoin ici
+        await saveFileToSession("memories_original.json", memoriesFile); 
         const userData = JSON.parse(await fileMap['user.json'].text());
         const memoriesData = JSON.parse(await memoriesFile.text());
         const friendsData = JSON.parse(await fileMap['friends.json'].text());
         
         allMemoriesData = memoriesData;
         
-        await saveFileToSession("memories_original.json", memoriesFile);
         
         localStorage.setItem('bereal_session_active', 'true');
         initApp(userData, memoriesData, friendsData);
 
         map.getCanvas().style.height = '100%';
-        map.resize();
+        syncPWAHeight()
         document.getElementById('upload-overlay').style.display = 'none';
     } catch (err) {
         console.error(err);
@@ -1111,17 +1070,54 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
     }
 });
 
+/**
+ * Transforme les données brutes des souvenirs en collection GeoJSON
+ */
+function convertMemoriesToGeoJSON(data) {
+    const momentCounts = {};
+    
+    return data.map(m => {
+        // Logique de détection de bonus (centralisée)
+        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
+        const isBonus = !!momentCounts[momentId];
+        momentCounts[momentId] = true;
+
+        // Normalisation des coordonnées
+        const lng = parseFloat(m.location?.longitude);
+        const lat = parseFloat(m.location?.latitude);
+
+        return {
+            type: 'Feature',
+            geometry: { 
+                type: 'Point', 
+                coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] 
+            },
+            properties: {
+                front: getLocalUrl(m.frontImage?.path),
+                back: getLocalUrl(m.backImage?.path),
+                caption: m.caption || "",
+                location: m.location,
+                rawDate: m.takenTime,
+                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                isLate: m.isLate,
+                isBonus: isBonus
+            }
+        };
+    });
+}
+
 // Nouvelle fonction de démarrage
 async function initApp(userData, memoriesData, friendsData) {
 
-    // 1. Mise à jour du Profil (Textes et Image)
-    const name = userData.username || "Utilisateur";
+    // On définit une valeur de secours (fallback)
+    const name = userData.username || userData.fullname || "Utilisateur BeReal";
     
-    // Header (Badge)
+    // Mise à jour du Badge (Header)
     const headerUser = document.getElementById('header-username');
     if (headerUser) headerUser.innerText = name;
 
-    // Modal
+    // Mise à jour de la Modale Photo
     const modalUser = document.querySelector('.bereal-username');
     if (modalUser) modalUser.innerText = name;
 
@@ -1134,38 +1130,9 @@ async function initApp(userData, memoriesData, friendsData) {
         }
     }
 
-    // 2. Préparation des photos pour la carte (Features GeoJSON)
-    const momentCounts = {}; 
+    // 2. Préparation des photos simplifiée
+    const features = convertMemoriesToGeoJSON(memoriesData);
 
-    const features = memoriesData.map(m => {
-        // Logique pour déterminer si c'est un bonus
-        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
-        const isBonus = !!momentCounts[momentId];
-        momentCounts[momentId] = true;
-
-        // GESTION DES COORDONNÉES : Si pas de location, on force à [0, 0]
-        const longitude = (m.location && m.location.longitude) ? m.location.longitude : 0;
-        const latitude = (m.location && m.location.latitude) ? m.location.latitude : 0;
-
-        return {
-            type: 'Feature',
-            geometry: { 
-                type: 'Point', 
-                coordinates: [longitude, latitude] 
-            },
-            properties: {
-                front: getLocalUrl(m.frontImage.path),
-                back: getLocalUrl(m.backImage.path),
-                caption: m.caption || "",
-                location: m.location,
-                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                rawDate: m.takenTime,
-                isLate: m.isLate,
-                isBonus: isBonus
-            }
-        };
-    });
     // 3. Chargement de la Carte
     if (features.length > 0) {
         const injectFeatures = () => {
@@ -1186,7 +1153,7 @@ async function initApp(userData, memoriesData, friendsData) {
     calculateStats(memoriesData, userData, friendsData);
     setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
-        map.resize();
+        syncPWAHeight()
     }, 300);
 
     setup3DBuildings();
@@ -1302,7 +1269,7 @@ async function handleAutoLogin() {
                 
                 setTimeout(() => {
                     window.dispatchEvent(new Event('resize'));
-                    map.resize();
+                    syncPWAHeight()
                 }, 300);
                 
                 loader.style.opacity = '0';
@@ -1328,39 +1295,21 @@ async function handleAutoLogin() {
 // Lancement
 handleAutoLogin();
 
-function fullResize() {
-    const vh = window.innerHeight;
-    document.documentElement.style.setProperty('--vh', `${vh}px`);
-    
-    // Ajout de la sécurité "&& map.resize"
-    if (typeof map !== 'undefined' && map && map.resize) {
-        map.resize();
-    }
-}
 
 async function handleLogout(event) {
-    if (event) event.stopPropagation(); // Empêche la fermeture de la modale
+    if (event) event.stopPropagation(); 
     
     if (confirm("Voulez-vous vraiment vous déconnecter et supprimer les données locales ?")) {
         try {
-            // 1. On vide la base de données IndexedDB (fichiers photos/JSON)
             const db = await openDB();
             const tx = db.transaction(STORE_NAME, "readwrite");
-            tx.objectStore(STORE_NAME).clear();
+            const store = tx.objectStore(STORE_NAME);
+            
+            store.clear(); // Vide IndexedDB
             
             tx.oncomplete = () => {
-                // 2. On vide le localStorage (marqueur de session)
-                localStorage.clear();
-                
-                // 3. On recharge la page pour revenir à l'écran d'upload
-                window.location.reload();
-            };
-
-            tx.onerror = (e) => {
-                console.error("Erreur lors de la suppression des données:", e);
-                // Fail-safe : on tente quand même le reload
-                localStorage.clear();
-                window.location.reload();
+                localStorage.removeItem('bereal_session_active'); // Nettoie le flag
+                window.location.reload(); // Retour à l'accueil
             };
         } catch (err) {
             console.error("Erreur déconnexion:", err);
@@ -1376,14 +1325,12 @@ function syncPWAHeight() {
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
 
-    // On récupère la hauteur réelle disponible
     const vh = window.innerHeight;
     
-    // On ne met à jour QUE si la hauteur a changé (évite les calculs inutiles)
     if (mapEl.style.height !== vh + 'px') {
         mapEl.style.height = vh + 'px';
         
-        // On prévient MapLibre que la taille a changé
+        // APPEL UNIQUE À MAPLIBRE ICI
         if (typeof map !== 'undefined' && map.resize) {
             map.resize();
         }
