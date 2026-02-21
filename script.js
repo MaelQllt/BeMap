@@ -694,11 +694,14 @@ map.on('pitch', updateNorthBtnVisibility);
 map.on('move', updateNorthBtnVisibility);
 
 // Reset au clic
+// Dans ton écouteur de clic sur le bouton boussole :
 northBtn.addEventListener('click', () => {
-    map.easeTo({
-        bearing: 0,
-        duration: 800
-    });
+    map.easeTo({ bearing: 0, duration: 800 });
+    
+    // On peut anticiper la disparition pour que le Pitch glisse de suite
+    setTimeout(() => {
+        updateNorthBtnVisibility();
+    }, 10); 
 });
 
 // Reset du Pitch au clic
