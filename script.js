@@ -627,93 +627,87 @@ function reAddLayers() {
     map.addLayer({ id: 'clusters', type: 'circle', source: 'bereal-src', filter: ['has', 'point_count'], paint: { 'circle-color': '#151517', 'circle-radius': 18, 'circle-stroke-width': 1, 'circle-stroke-color': '#d9d9d960' } });
     map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-opacity': 0, 'circle-radius': 15 } });
 }
+
+
+// Gestion du Nord (Bearing) et de l'inclinaison (Pitch)
+// 1. Mise en cache des éléments (Performance : évite de chercher dans le DOM à chaque frame)
 const northBtn = document.getElementById('north-button');
 const pitchBtn = document.getElementById('pitch-button');
+const pitchLine = document.getElementById('pitch-line');
+const pitchArc = document.getElementById('pitch-arc');
+const northIcon = northBtn.querySelector('svg');
 
-// Fonction pour vérifier la visibilité du bouton Nord
-function updateNorthBtnVisibility() {
+const dashboardModal = document.getElementById('dashboard-modal');
+const photoModal = document.getElementById('bereal-modal');
+
+/**
+ * Calcule le chemin SVG pour l'arc d'inclinaison
+ */
+function getPitchArcPath(pitch) {
+    const radius = 8;
+    const centerX = 7;
+    const centerY = 17;
+    
+    const angleRad = (pitch * Math.PI) / 180;
+    const endX = centerX + radius * Math.cos(-angleRad);
+    const endY = centerY + radius * Math.sin(-angleRad);
+    const startX = centerX + radius;
+    const startY = centerY;
+
+    return `M ${startX} ${startY} A ${radius} ${radius} 0 0 0 ${endX} ${endY}`;
+}
+
+/**
+ * Met à jour l'état visuel des boutons de contrôle
+ */
+function updateMapControls() {
     const bearing = map.getBearing();
     const pitch = map.getPitch(); 
     
+    // Seuils de visibilité
     const isRotated = Math.abs(bearing) > 0.5;
     const isPitched = pitch > 0.5;
 
-    const isDashboardOpen = document.getElementById('dashboard-modal').style.display === 'flex';
-    const isPhotoOpen = document.getElementById('bereal-modal').style.display === 'flex';
+    // État de l'interface
+    const isDashboardOpen = dashboardModal.style.display === 'flex';
+    const isPhotoOpen = photoModal.style.display === 'flex';
     const canShow = !isDashboardOpen && !isPhotoOpen;
 
     // --- GESTION DU BOUTON PITCH ---
-    const pitchBtn = document.getElementById('pitch-button');
-    const pitchLine = document.getElementById('pitch-line');
-    const pitchArc = document.getElementById('pitch-arc');
-
     if (canShow && isPitched) {
         pitchBtn.classList.add('visible');
-        
         if (pitchLine && pitchArc) {
-            // 1. Rotation de la ligne mobile
             pitchLine.style.transformOrigin = "7px 17px";
             pitchLine.style.transform = `rotate(${-pitch}deg)`;
-
-            // 2. Dessin de l'arc (Trigonométrie)
-            const radius = 8; // Rayon de l'arc
-            const centerX = 7;
-            const centerY = 17;
-            
-            // Calcul du point d'arrivée de l'arc (en radians)
-            const angleRad = (pitch * Math.PI) / 180;
-            const endX = centerX + radius * Math.cos(-angleRad);
-            const endY = centerY + radius * Math.sin(-angleRad);
-            
-            // Début de l'arc (sur la ligne de sol à droite du pivot)
-            const startX = centerX + radius;
-            const startY = centerY;
-
-            // Création du chemin SVG (Arc)
-            // M = Move to (start), A = Arc to (radiusX radiusY, rotation, largeArcFlag, sweepFlag, endX endY)
-            const d = `M ${startX} ${startY} A ${radius} ${radius} 0 0 0 ${endX} ${endY}`;
-            pitchArc.setAttribute('d', d);
+            pitchArc.setAttribute('d', getPitchArcPath(pitch));
         }
     } else {
         pitchBtn.classList.remove('visible');
     }
 
     // --- GESTION DE LA BOUSSOLE ---
-    const northBtn = document.getElementById('north-button');
-    if (isRotated && canShow) {
+    if (canShow && isRotated) {
         northBtn.classList.add('visible');
-        northBtn.querySelector('svg').style.transform = `rotate(${-bearing}deg)`;
+        northIcon.style.transform = `rotate(${-bearing}deg)`;
     } else {
         northBtn.classList.remove('visible');
     }
 }
 
-// Liaison aux événements MapLibre
-map.on('rotate', updateNorthBtnVisibility);
-map.on('pitch', updateNorthBtnVisibility);
-map.on('move', updateNorthBtnVisibility);
+// --- ÉVÉNEMENTS CARTE ---
+// Regroupement des événements MapLibre
+['rotate', 'pitch', 'move'].forEach(evt => map.on(evt, updateMapControls));
 
-// Reset au clic
-// Dans ton écouteur de clic sur le bouton boussole :
+// --- ACTIONS CLIC ---
 northBtn.addEventListener('click', () => {
     map.easeTo({ bearing: 0, duration: 800 });
-    
-    // On peut anticiper la disparition pour que le Pitch glisse de suite
-    setTimeout(() => {
-        updateNorthBtnVisibility();
-    }, 10); 
+    // Petit délai pour assurer la fluidité de la transition CSS
+    setTimeout(updateMapControls, 10); 
 });
 
-// Reset du Pitch au clic
 pitchBtn.addEventListener('click', () => {
-    map.easeTo({
-        pitch: 0,
-        duration: 800
-    });
+    map.easeTo({ pitch: 0, duration: 800 });
 });
-
-// Écouteur pour l'inclinaison
-map.on('pitch', updateNorthBtnVisibility);
 
 // #endregion
 

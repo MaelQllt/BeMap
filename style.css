@@ -787,25 +787,25 @@ body {
 .next-dash { right: -60px; }
 
 /* --- BOUTON BOUSSOLE (CORRECTION ANIMATION) --- */
-
-.map-controls-top {
+/* --- CONTENEUR --- */
+.map-controls {
     position: fixed;
     top: calc(20px + env(safe-area-inset-top));
     right: 25px;
     display: flex;
-    flex-direction: row-reverse; /* Compass à droite, Pitch à gauche */
+    flex-direction: row-reverse;
     align-items: center;
     z-index: 1000;
     pointer-events: none;
-    height: 40px; /* Hauteur fixe pour éviter les sauts */
+    height: 40px;
 }
 
-.compass-btn {
+/* --- STYLE DE BASE DU BOUTON --- */
+.map-control-btn {
     position: relative;
-    /* On définit la taille de base pour l'animation */
     width: 36px;
     height: 36px;
-    margin-left: 12px; /* L'espace (gap) se gère ici pour être animable */
+    margin-left: 12px;
     
     border-radius: 50%;
     background: rgba(15, 15, 17, 0.7);
@@ -819,17 +819,13 @@ body {
     cursor: pointer;
     pointer-events: auto;
 
-    /* État de base invisible et "rétracté" */
+    /* État de base invisible/rétracté */
     opacity: 0;
     transform: scale(0);
-    width: 36px;
-    margin-left: 12px;
-    /* Ajoute impérativement ceci pour éviter que le contenu bloque le rétrécissement */
     min-width: 0; 
     flex-shrink: 0;
     overflow: hidden;
 
-    /* Transition complète incluant width et margin pour le glissement */
     transition: 
         opacity 0.4s ease, 
         transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
@@ -838,20 +834,15 @@ body {
         background 0.3s ease;
 }
 
-/* LA FLÈCHE (SVG) */
-.compass-btn svg {
-    min-width: 20px; /* Empêche l'écrasement du SVG pendant l'animation du width */
-    height: 20px;
-}
-
-.compass-btn.visible {
+/* --- ÉTAT VISIBLE --- */
+.map-control-btn.visible {
     opacity: 1;
     transform: scale(1);
     width: 36px;
-    margin-left: 12px; /* Réactivation de l'espace entre les boutons */
+    margin-left: 12px;
 }
 
-.compass-btn:not(.visible) {
+.map-control-btn:not(.visible) {
     width: 0 !important;
     margin-left: 0 !important;
     margin-right: 0 !important;
@@ -861,57 +852,59 @@ body {
     pointer-events: none;
 }
 
-/* --- LE DOUBLE EFFET AU SURVOL --- */
+/* --- GESTION DES SVG --- */
+.map-control-btn svg {
+    min-width: 20px;
+    height: 20px;
+    transition: transform 0.3s ease, scale 0.3s ease; /* Ajout transition scale pour fluidité */
+}
 
-.compass-btn:hover {
+/* Grossissement indépendant au hover du BOUTON */
+.map-control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.4);
-    transform: scale(1.1); /* Le ROND grossit un peu (10%) */
+    transform: scale(1.1);
 }
 
-.compass-btn:hover svg {
-    scale: 1.3; /* La FLÈCHE grossit beaucoup plus (40%) */
+/* 1. Survol Boussole : La flèche grossit à 1.3 */
+.map-control-btn--compass:hover svg {
+    scale: 1.3;
 }
 
-/* Effet de pression au clic */
-.compass-btn:active {
-    transform: scale(0.95);
-}
-.compass-btn:active svg {
-    scale: 1;
-}
-
-
-/* Positionnement à gauche de la boussole */
-
-
-
-/* --- COMPASS SVG (Aiguille) --- */
-/* On cible le SVG uniquement quand on survole la boussole (pas le pitch) */
-#north-button:hover svg {
-    transform: scale(1.3); /* Contrôle la taille de la boussole ici */
-}
-
-/* --- PITCH SVG (Flèches) --- */
-/* On cible le SVG uniquement quand on survole le bouton pitch */
-.pitch-btn svg {
+/* 2. Pitch : Déjà à 1.3 par défaut, grossit encore plus au survol si désiré (ex: 1.5) */
+/* Sinon, supprime le sélecteur :hover ci-dessous pour le garder fixe */
+.map-control-btn--pitch svg {
     transform: scale(1.3);
     overflow: visible;
 }
 
-/* Pour s'assurer que l'arc est bien dessiné avec le stroke */
+.map-control-btn--pitch:hover svg {
+    scale: 1.3; /* On peut mettre 1.4 ou 1.5 ici pour un effet indépendant */
+}
+
+/* --- ÉTAT ACTIF (CLIC) --- */
+.map-control-btn:active {
+    transform: scale(0.95);
+}
+
+.map-control-btn:active svg {
+    scale: 1;
+    transform: scale(1);
+}
+
+/* --- DÉTAILS INTERNES PITCH --- */
+.pitch-line-bg {
+    opacity: 0.3;
+}
+
 #pitch-arc {
     fill: none;
     stroke: currentColor;
     stroke-width: 1.5;
     transition: d 0.1s linear;
+    opacity: 0.8;
 }
 
 #pitch-line {
     transition: transform 0.1s linear;
-}
-
-/* On peut mettre la ligne de base en opacité réduite pour le style */
-.pitch-btn line:first-child {
-    opacity: 0.3;
 }

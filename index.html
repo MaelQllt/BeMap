@@ -153,23 +153,21 @@
     </div>
 
 
-    <div class="map-controls-top">
-        <button id="north-button" class="compass-btn">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" fill="currentColor"/>
-            </svg>
-        </button>
+    <div class="map-controls">
+    <button id="north-button" class="map-control-btn map-control-btn--compass">
+        <svg viewBox="0 0 24 24">
+            <path d="M12 2L4.5 20.29L5.21 21L12 18L18.79 21L19.5 20.29L12 2Z" fill="currentColor"/>
+        </svg>
+    </button>
 
-        <button id="pitch-button" class="compass-btn pitch-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="7" y1="17" x2="19" y2="17" opacity="0.3" />
-                
-                <path id="pitch-arc" d="" opacity="0.8" />
-                
-                <line id="pitch-line" x1="7" y1="17" x2="19" y2="17" />
-            </svg>
-        </button>
-    </div>
+    <button id="pitch-button" class="map-control-btn map-control-btn--pitch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="7" y1="17" x2="19" y2="17" class="pitch-line-bg" />
+            <path id="pitch-arc" d="" />
+            <line id="pitch-line" x1="7" y1="17" x2="19" y2="17" />
+        </svg>
+    </button>
+</div>
 
     <script src="script.js"></script>
 </body>
