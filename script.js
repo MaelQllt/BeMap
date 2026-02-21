@@ -733,31 +733,52 @@ function openModal(photos) {
 
 function updateModalContent() {
     const p = currentPhotos[currentIndex];
+    const replaceBtn = document.getElementById('replace-button');
+    
+    if (replaceBtn) replaceBtn.style.setProperty('display', 'none', 'important');
+    if (!p) return;
+
+    // Normalisation de la localisation (String -> Object)
+    let loc = p.location;
+    if (typeof loc === 'string' && loc.trim() !== "") {
+        try {
+            loc = JSON.parse(loc);
+        } catch (e) {
+            loc = null;
+        }
+    }
+
+    // Réinitialisation de l'état visuel
     isFlipped = false; 
     resetZoomState();
+
+    // Mise à jour des médias et textes
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
-    document.getElementById('modal-caption').innerText = p.caption;
+    document.getElementById('modal-caption').innerText = p.caption || "";
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
     
     container.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
     
-    // --- MODIFICATION ICI ---
-    miniBox.style.transition = 'none';
-    if (currentMiniSide === 'right') {
-        // On calcule la position à droite
-        const rightPos = container.offsetWidth - miniBox.offsetWidth - 28;
-        miniBox.style.transform = `translate(${rightPos}px, 0px)`;
-    } else {
-        miniBox.style.transform = `translate(0px, 0px)`;
+    // Affichage du bouton "Replacer" si la localisation est invalide
+    const hasValidLocation = loc && loc.latitude && loc.longitude;
+    if (replaceBtn && !hasValidLocation) {
+        replaceBtn.style.setProperty('display', 'block', 'important');
     }
-    // -------------------------
 
-    document.getElementById('prevBtn').style.display = (currentPhotos.length > 1 && currentIndex > 0) ? 'flex' : 'none';
-    document.getElementById('nextBtn').style.display = (currentPhotos.length > 1 && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
+    // Positionnement de la miniature
+    miniBox.style.transition = 'none';
+    const xPos = currentMiniSide === 'right' ? (container.offsetWidth - miniBox.offsetWidth - 28) : 0;
+    miniBox.style.transform = `translate(${xPos}px, 0px)`;
+
+    // Gestion de la navigation
+    const hasMultiple = currentPhotos.length > 1;
+    document.getElementById('prevBtn').style.display = (hasMultiple && currentIndex > 0) ? 'flex' : 'none';
+    document.getElementById('nextBtn').style.display = (hasMultiple && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
+    
     const counter = document.getElementById('photo-counter');
     if (counter) {
-        counter.innerText = currentPhotos.length > 1 ? `${currentIndex + 1}/${currentPhotos.length}` : '';
+        counter.innerText = hasMultiple ? `${currentIndex + 1}/${currentPhotos.length}` : '';
     }
 }
 
@@ -981,6 +1002,7 @@ async function initApp(userData, memoriesData, friendsData) {
                 front: getLocalUrl(m.frontImage.path),
                 back: getLocalUrl(m.backImage.path),
                 caption: m.caption || "",
+                location: m.location,
                 date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
                 time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
                 rawDate: m.takenTime,
