@@ -1,0 +1,18 @@
+/* --- VARIABLES & BASE --- */
+:root {
+    --bg-color: #000;
+    --card-bg: #1c1c1e;
+    --text-primary: #ffffff;
+    --text-secondary: rgba(255, 255, 255, 0.6);
+}
+
+body { 
+    margin: 0; padding: 0; 
+    font-family: 'Inter', sans-serif; 
+    background: var(--bg-color); 
+    overflow: hidden;
+    height: 100vh;
+    /* Utilise la zone sécurisée pour éviter que le profil soit SOUS l'heure */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+}

@@ -1,0 +1,92 @@
+/* --- BADGE PROFIL HAUT GAUCHE --- */
+.user-profile-header {
+    position: fixed;
+    top: calc(15px + env(safe-area-inset-top));
+    left: 25px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    /* On active le curseur pour le hover */
+    pointer-events: auto; 
+    cursor: grab;
+    pointer-events: auto;
+    /* On enlève la transition CSS brute pour laisser le JS gérer la fluidité du suivi */
+    transition: transform 0.1s ease-out, filter 0.1s ease-in-out;
+}
+
+.user-profile-header:active {
+    cursor: grabbing;
+}
+
+.profile-pic-container {
+    width: 62px; 
+    height: 62px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1); 
+    padding: 3px; 
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2); 
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+    
+    /* Préparation de l'effet de relief */
+    overflow: hidden; 
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+}
+
+#profile-pic {
+    -webkit-user-drag: none;
+    pointer-events: none;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    /* Transition douce pour le zoom */
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: block;
+}
+
+/* --- EFFET AU SURVOL (HOVER) --- */
+
+/* 1. La photo zoome pour supprimer l'espace du padding */
+.user-profile-header:hover #profile-pic {
+    transform: scale(1.15); /* Ajuste pour que ça remplisse pile le cercle */
+}
+
+/* 2. Le container accentue le relief et la bordure */
+.user-profile-header:hover .profile-pic-container {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 
+        0 12px 25px rgba(0, 0, 0, 0.5),
+        inset 0 0 10px rgba(0, 0, 0, 0.3); /* Ombre interne pour l'effet courbé */
+    transform: translateY(-2px); /* Léger soulèvement */
+}
+
+#header-username {
+    color: white;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 300; 
+    text-transform: lowercase;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    letter-spacing: -0.3px;
+    margin-left: -4px; 
+    display: flex;
+    align-items: center;
+    transition: opacity 0.3s ease;
+}
+
+#header-username::before {
+    content: "\\";
+    margin-right: 1px;
+    font-weight: 450;
+}
+
+/* Optionnel : on peut rendre le texte un peu plus brillant au survol */
+.user-profile-header:hover #header-username {
+    opacity: 1;
+    font-weight: 400;
+}

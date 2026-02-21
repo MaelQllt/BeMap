@@ -415,7 +415,7 @@ function openDashboard() {
 
     if (cachedStats) updateDashboardUI();
 
-    updateNorthBtnVisibility();
+    
 }
 
 /**
@@ -438,7 +438,7 @@ function closeDashboard() {
         badge.style.pointerEvents = 'auto';
     }
 
-    updateNorthBtnVisibility();
+    
 }
 
 // #endregion
@@ -732,7 +732,7 @@ function openModal(photos) {
     badge.style.filter = 'blur(3px)';
     badge.style.pointerEvents = 'none';
 
-    updateNorthBtnVisibility();
+    
 }
 
 function updateModalContent() {
@@ -780,7 +780,7 @@ function closeModal() {
     badge.style.filter = 'none';
     badge.style.pointerEvents = 'auto';
 
-    updateNorthBtnVisibility();
+    
 }
 
 // --- LOGIQUE PHOTO (DRAG & FLIP) ---

@@ -1,0 +1,404 @@
+/* DASHBOARD STATS */
+
+.dashboard-content {
+    position: fixed; 
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: none; 
+    justify-content: center; 
+    align-items: center;
+    z-index: 10001; 
+    background: rgba(0,0,0,0.2);
+    flex-direction: column; /* Aligne le dashboard et le bouton verticalement */
+    gap: 20px; /* Espace entre le dashboard et le bouton de déconnexion */
+}
+
+.dashboard-content {
+    width: 85%; 
+    max-width: 440px;
+    background: rgba(15, 15, 15, 0.85); /* Plus sombre */
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border-radius: 38px;
+    padding: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
+}
+
+.dashboard-header {
+    position: relative;
+    z-index: 20; /* Plus haut que les cartes qui "gonflent" */
+    display: flex; 
+    justify-content: space-between;
+    align-items: center; 
+    margin-bottom: 30px;
+    padding: 0 10px;
+}
+
+/* --- LE TITRE (ÉTAT DE BASE) --- */
+.dashboard-title { 
+    font-size: 26px; 
+    font-weight: 900; 
+    letter-spacing: -1.5px;
+    color: white;
+    display: inline-block; /* Crucial pour que le scale fonctionne */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+    cursor: default;
+    margin-top: 7px;
+}
+
+/* --- L'EFFET DE GONFLEMENT --- */
+/* On cible le titre quand on hover le container parent (header) */
+.dashboard-title:hover {
+    transform: translateY(-5px); /* Léger soulèvement de la carte */
+    transform: scale(1.15);
+}
+
+
+/* --- CROIX POUR FERMER LE DASHBOARD --- */
+.close-dash { 
+    background: #ffffff14; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white; 
+    width: 36px; 
+    height: 36px; 
+    border-radius: 50%; 
+    cursor: pointer; 
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* --- INTERACTION CROIX --- */
+.close-dash:hover {
+    background: #ffffff00; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white; 
+    transform: rotate(90deg) scale(1.15);
+}
+
+
+/* --- STATS CARDS --- */
+.stats-grid {
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 15px; 
+    margin-bottom: 0; /* On gère le margin via le gap global si besoin */
+}
+
+/* --- HARMONISATION DES CARTES --- */
+.stat-card {
+    background: #ffffff14;
+    padding: 24px 15px; 
+    border-radius: 24px;
+    display: flex; 
+    flex-direction: column; 
+    align-items: center;
+    justify-content: center; /* Centre verticalement le contenu */
+    border: 1px solid transparent;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: default;
+    
+    /* Force une hauteur minimale identique pour toutes les petites cartes */
+    min-height: 120px; 
+    box-sizing: border-box;
+}
+
+/* --- AJUSTEMENT DES VALEURS --- */
+.stat-value { 
+    font-size: 32px; /* Réduit de 38px à 32px pour laisser respirer */
+    font-weight: 900; 
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+    display: inline-block;
+    color: var(--text-secondary);
+    text-align: center;
+    width: 100%;
+    white-space: nowrap;      /* Empêche le retour à la ligne */
+    overflow: hidden;         /* Coupe si c'est vraiment trop long */
+    text-overflow: ellipsis;  /* Ajoute "..." si c'est coupé */
+}
+
+
+/* --- INTERACTION CARTE --- */
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-5px); /* Léger soulèvement de la carte */
+}
+
+.stat-value { 
+    font-size: 38px; 
+    font-weight: 900; 
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
+    display: inline-block; /* Important pour que le scale fonctionne */
+    color: var(--text-secondary); 
+}
+
+/* --- EFFET GONFLEMENT DU CHIFFRE --- */
+.stat-card:hover .stat-value {
+    transform: scale(1.15); /* Le chiffre "gonfle" */
+    color: #fff;
+}
+
+.stat-label { 
+    font-size: 10px; 
+    font-weight: 700; 
+    color: var(--text-secondary); 
+    letter-spacing: 1.2px; 
+    margin-top: 8px;
+    transition: color 0.3s ease;
+}
+
+.stat-card:hover .stat-label {
+    color: #fff; /* Le label devient blanc aussi */
+}
+
+
+/* --- STREAK CARDS --- */
+.streak-card {
+    grid-column: span 2;
+    background: #ffffff;
+    color: #1a1a1a;
+    padding: 0 25px;
+    height: 110px;
+    border-radius: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    cursor: default;
+    box-sizing: border-box;
+}
+
+.streak-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.streak-value {
+    font-size: 42px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.streak-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-top: 5px;
+    color: #1a1a1a;
+}
+
+.streak-card:hover{
+    color: #000000;
+    transform: scale(1.02);
+}
+
+.streak-card:hover .streak-label{
+    color: #000000;
+    transform: scale(1.02);
+}
+
+/* --- BASE DES ICÔNES --- */
+.streak-icon {
+    font-size: 40px;
+    display: inline-block; /* CRUCIAL pour que les rotations fonctionnent */
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease;
+    pointer-events: auto; /* S'assure que l'icône capte bien la souris */
+}
+
+/* 1. Les deux grossissent quand on survole la CARTE */
+.streak-card:hover .streak-icon {
+    transform: scale(1.2);
+}
+
+/* 2. LA FLAMME : Animation active UNIQUEMENT au survol direct de l'icône */
+/* On cible soit la classe flame-icon, soit l'icône dans la carte qui a l'ID du record */
+.flame-icon:hover, 
+.streak-card:has(#stat-max-streak) .streak-icon:hover {
+    animation: flameWobble 0.5s ease-in-out infinite !important;
+    filter: drop-shadow(0 0 12px rgba(255, 100, 0, 0.8));
+}
+
+/* 3. LE CALENDRIER : Simple scale au survol direct, sans bouger */
+.calendar-icon:hover,
+.streak-card:has(#stat-join-date) .streak-icon:hover {
+    transform: scale(1.3) !important;
+    animation: none !important;
+}
+
+/* --- L'ANIMATION (Assure-toi que les valeurs de scale match l'état survolé) --- */
+@keyframes flameWobble {
+    0% { transform: scale(1.4) rotate(-8deg); }
+    25% { transform: scale(1.5) rotate(5deg); }
+    50% { transform: scale(1.45) rotate(-5deg); }
+    75% { transform: scale(1.55) rotate(4deg); }
+    100% { transform: scale(1.4) rotate(-8deg); }
+}
+
+
+/* --- NAVIGATION ENTRE LES PAGES --- */
+
+#dash-cards-wrapper {
+    overflow: visible; /* CRUCIAL : permet aux cartes de gonfler sans être coupées */
+    position: relative;
+    width: 100%;
+    /* On ajoute un masque conteneur pour l'effet de slide propre */
+    clip-path: inset(-100% 0px -100% 0px); 
+}
+
+#dash-slider {
+    display: flex;
+    width: 200%;
+    transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.dash-page {
+    width: 50%;
+    flex-shrink: 0;
+    display: block !important;
+    /* L'ASTUCE : On met du padding latéral pour créer l'espace vide entre les deux pages */
+    padding: 0 10px; 
+    box-sizing: border-box;
+}
+
+#dash-page-1, #dash-page-2 {
+    width: 50%;
+    flex-shrink: 0;
+}
+
+
+.dash-page.exiting-left {
+    animation: exitToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.exiting-right {
+    animation: exitToRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.entering-right {
+    animation: enterFromRight 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.dash-page.entering-left {
+    animation: enterFromLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes exitToLeft {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(-60px); opacity: 0; }
+}
+@keyframes exitToRight {
+    from { transform: translateX(0); opacity: 1; }
+    to   { transform: translateX(60px); opacity: 0; }
+}
+@keyframes enterFromRight {
+    from { transform: translateX(60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes enterFromLeft {
+    from { transform: translateX(-60px); opacity: 0; }
+    to   { transform: translateX(0); opacity: 1; }
+}
+
+/* --- BOUTONS NAVIGATION DASHBOARD (Style Modale Photo) --- */
+.dash-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.15); /* Même fond que les flèches photo */
+    border: none;
+    color: white;
+    width: 45px; /* Taille légèrement réduite pour le dashboard */
+    height: 45px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    opacity: 1; /* On garde l'opacité pleine */
+    transition: all 0.3s ease;
+    font-size: 20px; /* Pour le symbole */
+}
+
+.dash-nav:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.prev-dash { left: -60px; }
+.next-dash { right: -60px; }
+
+/* --- LOGOUT --- */
+
+/* Le wrapper devient la zone de détection (Hitbox fixe) */
+.logout-wrapper {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    padding: 15px 0; /* Crée une zone de confort autour du bouton */
+    animation: fadeIn 0.8s ease-out;
+    cursor: pointer;
+}
+
+.logout-card-minimal {
+    background: rgba(0, 0, 0, 0.4); 
+    padding: 8px 18px; 
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: inline-flex;
+    align-items: center;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    pointer-events: none; /* Le bouton ignore la souris, c'est le wrapper qui gère tout */
+}
+
+/* QUAND ON SURVOLE LE WRAPPER (qui est fixe), ON FAIT BOUGER LA CARTE */
+.logout-wrapper:hover .logout-card-minimal {
+    background: rgba(255, 68, 68, 0.1); 
+    border-color: rgba(255, 68, 68, 0.3);
+    transform: translateY(-3px); 
+}
+
+/* On applique aussi les changements de texte via le wrapper */
+.logout-wrapper:hover .logout-label-minimal {
+    color: #fb3c30;
+    font-weight: 400;
+    transform: scale(1.02);
+}
+
+/* Effet au clic sur le wrapper */
+.logout-wrapper:active .logout-card-minimal {
+    transform: scale(0.95);
+}
+
+.logout-card-minimal:hover {
+    background: rgba(255, 68, 68, 0.1); 
+    border-color: rgba(255, 68, 68, 0.3);
+    /* Le mouvement est fluide et ne causera plus de tremblement */
+    transform: translateY(-3px); 
+}
+
+.logout-label-minimal {
+    font-size: 10px; 
+    font-weight: 300; 
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+}
+
+
+
+.logout-card-minimal:hover .logout-label-minimal {
+    color: #ff6666; /* Le texte s'éclaire en rouge */
+    font-weight: 400;
+    transform: scale(1.02);
+}
+
+/* Effet au clic */
+.logout-card-minimal:active {
+    transform: scale(0.95);
+}
