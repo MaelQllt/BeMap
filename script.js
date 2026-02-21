@@ -823,7 +823,9 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => {
     if (isDragging) {
         isDragging = false;
+        
         if (!hasDragged) {
+            // Logique de flip (inchangée)
             isFlipped = !isFlipped;
             const p = currentPhotos[currentIndex];
             mainPhoto.src = isFlipped ? p.front : p.back;
@@ -831,11 +833,40 @@ document.addEventListener('mouseup', () => {
         } else {
             justFinishedDrag = true;
             miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+            
             const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth/2) > (container.getBoundingClientRect().left + container.offsetWidth/2);
-        
             currentMiniSide = snapRight ? 'right' : 'left'; 
-
             miniBox.style.transform = snapRight ? `translate(${container.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
+
+            // --- ANIMATION DU COMPTEUR (À L'OPPOSÉ DE LA MINIATURE) ---
+            const counter = document.getElementById('photo-counter');
+            if (counter) {
+                // 1. On détermine la direction d'entrée pour l'effet de slide
+                // Si snapRight est vrai, le compteur va à GAUCHE, donc il arrive de la gauche
+                if (snapRight) {
+                    counter.classList.add('from-left');
+                } else {
+                    counter.classList.remove('from-left');
+                }
+
+                // 2. On lance la disparition
+                counter.classList.add('switching');
+
+                setTimeout(() => {
+                    // 3. INVERSION : Si la miniature est à droite (snapRight), le compteur va à gauche
+                    if (snapRight) {
+                        counter.style.left = '20px';
+                        counter.style.right = 'auto';
+                    } else {
+                        counter.style.left = 'auto';
+                        counter.style.right = '20px';
+                    }
+                    
+                    // 4. Réapparition avec glissement
+                    counter.classList.remove('switching');
+                }, 150); 
+            }
+
             setTimeout(() => justFinishedDrag = false, 500);
         }
     }
