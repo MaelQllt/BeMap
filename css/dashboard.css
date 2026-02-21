@@ -17,23 +17,51 @@
     pointer-events: auto; /* Bloque les clics pour la carte derrière */
 }
 
-.dashboard-content {
-    position: fixed; 
-    top: 50%; 
-    left: 50%; 
-    transform: translate(-50%, -50%); /* Centre parfaitement la carte au milieu */
-    width: 85%; 
+.dashboard-positioner {
+    position: fixed;
+    inset: 0;                    /* top/right/bottom/left: 0 */
+    margin: auto;                /* centre automatiquement */
+    width: 85%;
     max-width: 440px;
+    height: fit-content;         /* prend la hauteur du contenu */
+    display: none;
+    flex-direction: column;
+    /* ZERO transform ici */
+}
+
+.dashboard-content {
+    position: relative;
+    top: unset;
+    left: unset;
+    transform: none;
+    width: 100%; /* plus 85% ici */
     background: rgba(15, 15, 15, 0.85);
-    backdrop-filter: blur(25px) saturate(180%);
-    -webkit-backdrop-filter: blur(25px) saturate(180%);
     border-radius: 38px;
     padding: 30px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
-    z-index: 10001;
-    display: none; /* Changé en 'flex' par le JS */
+    display: flex; /* toujours flex, c'est le positioner qui cache */
     flex-direction: column;
+    overflow: visible !important;
+}
+
+/* SUPPRIME .dashboard-content::before et remplace par : */
+.dashboard-blur-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: 38px;
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.dashboard-header,
+#dash-cards-wrapper,
+.logout-wrapper,
+.dash-nav {
+    position: relative;
+    z-index: 1;
 }
 
 .dashboard-header {
@@ -43,7 +71,7 @@
     justify-content: space-between;
     align-items: center; 
     margin-bottom: 30px;
-    padding: 0 10px;
+    padding: 0 5px;
 }
 
 /* --- LE TITRE (ÉTAT DE BASE) --- */
@@ -95,10 +123,10 @@
 
 /* #region 2 STATS CARDS */
 .stats-grid {
-    display: grid; 
-    grid-template-columns: 1fr 1fr; 
-    gap: 15px; 
-    margin-bottom: 0; /* On gère le margin via le gap global si besoin */
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    width: 100%;
 }
 
 /* --- HARMONISATION DES CARTES --- */
@@ -111,12 +139,30 @@
     align-items: center;
     justify-content: center; /* Centre verticalement le contenu */
     border: 1px solid transparent;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                background-color 0.3s ease, 
+                border-color 0.3s ease;
     cursor: default;
     
     /* Force une hauteur minimale identique pour toutes les petites cartes */
     min-height: 120px; 
     box-sizing: border-box;
+
+    position: relative;
+    z-index: 1;
+
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
+    transform-style: preserve-3d;
+}
+
+.stat-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    transform: translateY(-5px) scale(1.04); /* Combine tes deux transforms ici */
+    
+    position: relative; 
+    z-index: 999 !important; 
 }
 
 /* --- AJUSTEMENT DES VALEURS --- */
@@ -139,6 +185,8 @@
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
     transform: translateY(-5px); /* Léger soulèvement de la carte */
+    z-index: 50;
+    position: relative;
 }
 
 .stat-value { 
@@ -260,27 +308,47 @@
 /* #region 4 NAVIGATION ENTRE LES PAGES */
 
 #dash-cards-wrapper {
-    overflow: visible; /* CRUCIAL : permet aux cartes de gonfler sans être coupées */
     position: relative;
-    width: 100%;
-    /* On ajoute un masque conteneur pour l'effet de slide propre */
-    clip-path: inset(-100% 0px -100% 0px); 
+    z-index: 5;
+    overflow: hidden !important;
+    margin-left: -30px; 
+    width: calc(100% + 60px); 
+    padding: 15px 0; 
+    /* Ajoute ceci pour lisser le rendu sur mobile */
+    -webkit-overflow-scrolling: touch;
 }
 
 #dash-slider {
     display: flex;
     width: 200%;
-    transition: transform 0.8s cubic-bezier(0.19, 1, 0.22, 1);
+    will-change: transform;
+    /* On stabilise le rendu */
+    transform: translateZ(0); 
+    transition: transform 0.6s cubic-bezier(0.2, 1, 0.3, 1);
+}
+
+#dash-slider:active .stat-card {
+    pointer-events: none; /* Optionnel : désactive le hover pendant le slide */
 }
 
 .dash-page {
     width: 50%;
     flex-shrink: 0;
-    display: block !important;
-    /* L'ASTUCE : On met du padding latéral pour créer l'espace vide entre les deux pages */
-    padding: 0 10px; 
+    padding: 0 30px; 
     box-sizing: border-box;
+    display: block !important;
+    overflow: visible !important;
+    /* On utilise l'opacité simple au lieu des animations complexes */
+    transition: opacity 0.4s ease;
+    backface-visibility: hidden;
+    perspective: 1000px;
 }
+
+/* On cache légèrement la page qui n'est pas devant l'utilisateur */
+.dash-page[aria-hidden="true"] {
+    opacity: 0.4;
+}
+
 
 #dash-page-1, #dash-page-2 {
     width: 50%;
@@ -288,7 +356,7 @@
 }
 
 
-.dash-page.exiting-left {
+/* .dash-page.exiting-left {
     animation: exitToLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 .dash-page.exiting-right {
@@ -316,7 +384,7 @@
 @keyframes enterFromLeft {
     from { transform: translateX(-60px); opacity: 0; }
     to   { transform: translateX(0); opacity: 1; }
-}
+} */
 
 /* --- BOUTONS NAVIGATION DASHBOARD (Style Modale Photo) --- */
 .dash-nav {
@@ -333,12 +401,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 100;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
     opacity: 1; /* On garde l'opacité pleine */
     transition: all 0.3s ease;
     font-size: 20px; /* Pour le symbole */
+    pointer-events: auto;
+    z-index: 10001 !important;
+    visibility: visible !important;
 }
 
 .dash-nav:hover {
@@ -346,8 +416,8 @@
     transform: translateY(-50%) scale(1.1);
 }
 
-.prev-dash { left: -60px; }
-.next-dash { right: -60px; }
+.prev-dash { left: -60px !important; }
+.next-dash { right: -60px !important; }
 
 /* #endregion 4 */
 

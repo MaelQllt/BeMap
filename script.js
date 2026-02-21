@@ -119,6 +119,10 @@ let isRelocating = false;
 let memoryToUpdate = null;
 let allMemoriesData = []; // Pour garder une trace de toutes les données chargées
 
+// Variables GeoJSON
+let worldGeoCache = null;
+let depsGeoCache = null;
+
 // #endregion
 
 
@@ -186,36 +190,33 @@ function switchDash(direction = 'right') {
     isAnimatingDash = true;
 
     const slider = document.getElementById('dash-slider');
-    
-    // 1. On réduit la durée à 0.4s pour plus de nervosité
     const animDuration = 400; 
-    // 2. On libère le clic un peu avant la fin (après 300ms) pour permettre l'enchaînement
     const unlockDelay = 300; 
 
     slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
 
     if (direction === 'right') {
+        // On glisse vers la gauche de la moitié de la largeur du slider (soit 1 page)
         slider.style.transform = 'translateX(-50%)';
         
         setTimeout(() => {
             slider.style.transition = 'none';
-            slider.appendChild(slider.firstElementChild);
+            slider.appendChild(slider.firstElementChild); // On déplace la page vue à la fin
             slider.style.transform = 'translateX(0%)';
-            // On ne met PAS isAnimatingDash ici
         }, animDuration);
         
     } else {
+        // Pour aller à gauche, on prépare la page précédente instantanément
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
         slider.style.transform = 'translateX(-50%)';
         
-        slider.offsetHeight; // Force reflow
+        slider.offsetHeight; // Force le rendu
         
         slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         slider.style.transform = 'translateX(0%)';
     }
 
-    // LE SECRET : On débloque le bouton AVANT que l'animation soit totalement finie
     setTimeout(() => {
         isAnimatingDash = false;
     }, unlockDelay);
@@ -256,17 +257,22 @@ async function calculateStats(data, userData, friendsData) {
         });
         const percent = momentIds.length > 0 ? Math.round((onTimeCount / momentIds.length) * 100) : 0;
 
-        // 3. GÉOGRAPHIE (PAYS & DÉPARTEMENTS) via Turf.js
+        // 3. GÉOGRAPHIE : Utilisation du cache
         const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
         const uniqueGeoPoints = validMemories.map(m => [m.location.longitude, m.location.latitude]);
 
-        const [respWorld, respDeps] = await Promise.all([
-            fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
-            fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
-        ]);
+        // On ne fetch que si le cache est vide
+        if (!worldGeoCache || !depsGeoCache) {
+            const [respWorld, respDeps] = await Promise.all([
+                fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
+                fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
+            ]);
+            worldGeoCache = await respWorld.json();
+            depsGeoCache = await respDeps.json();
+        }
         
-        const worldGeo = await respWorld.json();
-        const depsGeo = await respDeps.json();
+        const worldGeo = worldGeoCache;
+        const depsGeo = depsGeoCache;
         
         const foundCountries = new Set();
         const foundDeps = new Set();
@@ -397,7 +403,7 @@ function updateDashboardUI() {
 function openDashboard() {
     // 1. On récupère les DEUX éléments (l'overlay et le contenu)
     const modal = document.getElementById('dashboard-modal');
-    const content = document.querySelector('.dashboard-content');
+    const content = document.querySelector('.dashboard-positioner');
     const mapEl = document.getElementById('map');
     const badge = document.querySelector('.user-profile-header');
 
@@ -424,10 +430,12 @@ function openDashboard() {
  */
 function closeDashboard() {
     const modal = document.getElementById('dashboard-modal');
+    const content = document.querySelector('.dashboard-positioner');
     const mapEl = document.getElementById('map');
     const badge = document.querySelector('.user-profile-header');
 
     if (modal) modal.style.display = 'none';
+    if (content) content.style.display = 'none';
     
     if (mapEl) {
         mapEl.style.transform = 'scale(1)'; // On reset le scale
@@ -724,7 +732,7 @@ function updateMapControls() {
     const isPitched = pitch > 0.5;
 
     // État de l'interface
-    const isDashboardOpen = dashboardModal.style.display === 'flex';
+    const isDashboardOpen = document.querySelector('.dashboard-positioner')?.style.display === 'flex';
     const isPhotoOpen = photoModal.style.display === 'flex';
     const canShow = !isDashboardOpen && !isPhotoOpen;
 
@@ -769,26 +777,40 @@ map.on('click', async (e) => {
     if (!isRelocating || !memoryToUpdate) return;
 
     const { lng, lat } = e.lngLat;
-
     const index = allMemoriesData.findIndex(m => m.takenTime === memoryToUpdate.rawDate);
     
     if (index !== -1) {
+        // 1. Mise à jour de la position
         allMemoriesData[index].location = { latitude: lat, longitude: lng };
 
+        // 2. Sauvegarde dans IndexedDB
         const updatedJsonBlob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
         await saveFileToSession("memories.json", updatedJsonBlob);
 
+        // 3. Rafraîchissement visuel de la carte
         refreshMapMarkers(allMemoriesData);
+        checkDifferencesAndShowExport();
 
-        // --- AJOUT : Faire apparaître le bouton de téléchargement ---
-        const exportBtn = document.getElementById('export-json-btn');
-        if (exportBtn) exportBtn.style.display = 'inline-flex'; 
+        // --- AJOUT : RECALCUL DES STATS ---
+        // On récupère les fichiers JSON nécessaires à calculateStats depuis notre fileMap globale
+        try {
+            const userData = JSON.parse(await fileMap['user.json'].text());
+            const friendsData = fileMap['friends.json'] ? JSON.parse(await fileMap['friends.json'].text()) : [];
+            
+            // On relance le calcul avec les nouvelles coordonnées de allMemoriesData
+            await calculateStats(allMemoriesData, userData, friendsData);
+            console.log("Statistiques géographiques mises à jour !");
+        } catch (err) {
+            console.error("Erreur lors du recalcul des stats post-déplacement:", err);
+        }
+        // ----------------------------------
 
         isRelocating = false;
         document.getElementById('map').style.cursor = '';
-        alert("Position mise à jour !");
+        alert("Position mise à jour et statistiques actualisées !");
     }
 });
+
 
 // #endregion
 
@@ -1050,6 +1072,7 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
     const files = e.target.files;
     const statusMsg = document.getElementById('status-msg');
     statusMsg.innerText = "Création de la session... (0%)";
+    
 
     let count = 0;
     for (let file of files) {
@@ -1066,21 +1089,24 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
     }
 
     try {
+        const memoriesFile = fileMap['memories.json'];
+        await saveFileToSession("memories_original.json", memoriesFile); // On crée le témoin ici
         const userData = JSON.parse(await fileMap['user.json'].text());
-        const memoriesData = JSON.parse(await fileMap['memories.json'].text());
+        const memoriesData = JSON.parse(await memoriesFile.text());
         const friendsData = JSON.parse(await fileMap['friends.json'].text());
         
-        // On marque la session comme active dans le navigateur
-        localStorage.setItem('bereal_session_active', 'true');
+        allMemoriesData = memoriesData;
         
+        await saveFileToSession("memories_original.json", memoriesFile);
+        
+        localStorage.setItem('bereal_session_active', 'true');
         initApp(userData, memoriesData, friendsData);
 
-        // Fix bande noire PWA
         map.getCanvas().style.height = '100%';
         map.resize();
-
         document.getElementById('upload-overlay').style.display = 'none';
     } catch (err) {
+        console.error(err);
         alert("Dossier invalide.");
     }
 });
@@ -1209,6 +1235,42 @@ document.addEventListener('keydown', (e) => {
  * GESTION DU DÉMARRAGE ET DE LA SESSION
  */
 
+
+async function checkDifferencesAndShowExport() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, "readonly");
+    const store = tx.objectStore(STORE_NAME);
+    
+    // On récupère les deux versions
+    const reqCurrent = store.get("memories.json");
+    const reqOriginal = store.get("memories_original.json");
+
+    reqCurrent.onsuccess = () => {
+        reqOriginal.onsuccess = () => {
+            const exportBtn = document.getElementById('export-json-btn');
+            if (!exportBtn) return;
+
+            // Si l'original n'existe pas encore (premier import), on ne peut pas comparer
+            if (!reqOriginal.result || !reqCurrent.result) {
+                exportBtn.style.display = 'none';
+                return;
+            }
+
+            // On compare les contenus bruts (ArrayBuffers)
+            // C'est plus fiable que de comparer des objets JSON qui peuvent changer d'ordre
+            const currentData = new Uint8Array(reqCurrent.result.buffer);
+            const originalData = new Uint8Array(reqOriginal.result.buffer);
+
+            if (currentData.length !== originalData.length || currentData.some((val, i) => val !== originalData[i])) {
+                console.log("Différence détectée entre memories et memories_original");
+                exportBtn.style.setProperty('display', 'inline-flex', 'important');
+            } else {
+                exportBtn.style.display = 'none';
+            }
+        };
+    };
+}
+
 async function handleAutoLogin() {
     const loader = document.getElementById('loading-screen');
     const uploadOverlay = document.getElementById('upload-overlay');
@@ -1217,21 +1279,27 @@ async function handleAutoLogin() {
         const savedFiles = await loadSessionFiles();
         const keys = Object.keys(savedFiles);
 
+        // On vérifie si on a les fichiers essentiels
         if (keys.length > 0 && savedFiles['user.json'] && savedFiles['memories.json']) {
             fileMap = savedFiles;
-            
-            // On masque l'upload immédiatement si on a des fichiers
             uploadOverlay.style.display = 'none';
 
+            // 1. Extraction des données
             const userData = JSON.parse(await savedFiles['user.json'].text());
             const memoriesData = JSON.parse(await savedFiles['memories.json'].text());
-            allMemoriesData = memoriesData; // On stocke pour pouvoir le modifier plus tard
-            const friendsData = JSON.parse(await savedFiles['friends.json'].text()); 
+            allMemoriesData = memoriesData;
+            const friendsData = savedFiles['friends.json'] ? JSON.parse(await savedFiles['friends.json'].text()) : [];
+            
+            // 2. Mise à jour de l'état global
+            allMemoriesData = memoriesData; 
 
+            // 3. Lancement de la vérification du bouton export
+            await checkDifferencesAndShowExport();
+
+            // 4. Fonction de démarrage (maintenant elle voit bien les variables au-dessus)
             const startApp = () => {
                 initApp(userData, memoriesData, friendsData);
                 
-                // On force le resize ici aussi pour la PWA
                 setTimeout(() => {
                     window.dispatchEvent(new Event('resize'));
                     map.resize();
@@ -1245,7 +1313,8 @@ async function handleAutoLogin() {
             else map.once('load', startApp);
 
         } else {
-            console.warn("Session incomplète ou vide. Redirection upload.");
+            // Pas de fichiers trouvés : on montre l'écran d'upload
+            console.warn("Session incomplète ou vide.");
             loader.style.display = 'none';
             uploadOverlay.style.display = 'flex';
         }

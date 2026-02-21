@@ -105,73 +105,75 @@
 
     <!-- Dashboard des stats, nombre de pays visités, départements, nombre de BeReals, % à l'heure, best streak-->
     <div id="dashboard-modal" class="modal-overlay" onclick="closeDashboard()">
-        <div class="dashboard-content" onclick="event.stopPropagation()">
-            
-            <button class="dash-nav prev-dash" onclick="switchDash('left')">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            </button>
-            <button class="dash-nav next-dash" onclick="switchDash('right')">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
+        <div class="dashboard-positioner">
+            <div class="dashboard-content" onclick="event.stopPropagation()">
+                <div class="dashboard-blur-bg"></div> 
+                
+                <button class="dash-nav prev-dash" onclick="switchDash('left')">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button class="dash-nav next-dash" onclick="switchDash('right')">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
 
-            <!-- HEADER FIXE : ne bouge jamais -->
-            <div class="dashboard-header">
-                <span class="dashboard-title">My BeReal.</span>
-                <button class="close-dash" onclick="closeDashboard()">×</button>
-            </div>
+                <!-- HEADER FIXE : ne bouge jamais -->
+                <div class="dashboard-header">
+                    <span class="dashboard-title">My BeReal.</span>
+                    <button class="close-dash" onclick="closeDashboard()">×</button>
+                </div>
 
-            <!-- ZONE ANIMÉE : seules les cards roulent -->
-            <div id="dash-cards-wrapper">
-                <div id="dash-slider">
-                    <div id="dash-page-1" class="dash-page">
-                        <div class="stats-grid">
-                            <div class="stat-card"><span class="stat-value" id="stat-countries">0</span><span class="stat-label">PAYS</span></div>
-                            <div class="stat-card"><span class="stat-value" id="stat-deps">0</span><span class="stat-label">DÉPARTEMENTS</span></div>
-                            <div class="stat-card"><span class="stat-value" id="stat-streak">0</span><span class="stat-label">MEMORIES</span></div>
-                            <div class="stat-card"><span class="stat-value" id="stat-ontime">0%</span><span class="stat-label">À L'HEURE</span></div>
-                            <div class="streak-card">
-                                <div class="streak-content">
-                                    <span class="streak-value" id="stat-max-streak">0</span>
-                                    <span class="streak-label">JOURS CONSÉCUTIFS (RECORD)</span>
+                <!-- ZONE ANIMÉE : seules les cards roulent -->
+                <div id="dash-cards-wrapper">
+                    <div id="dash-slider">
+                        <div id="dash-page-1" class="dash-page">
+                            <div class="stats-grid">
+                                <div class="stat-card"><span class="stat-value" id="stat-countries">0</span><span class="stat-label">PAYS</span></div>
+                                <div class="stat-card"><span class="stat-value" id="stat-deps">0</span><span class="stat-label">DÉPARTEMENTS</span></div>
+                                <div class="stat-card"><span class="stat-value" id="stat-streak">0</span><span class="stat-label">MEMORIES</span></div>
+                                <div class="stat-card"><span class="stat-value" id="stat-ontime">0%</span><span class="stat-label">À L'HEURE</span></div>
+                                <div class="streak-card">
+                                    <div class="streak-content">
+                                        <span class="streak-value" id="stat-max-streak">0</span>
+                                        <span class="streak-label">JOURS CONSÉCUTIFS (RECORD)</span>
+                                    </div>
+                                    <div class="streak-icon flame-icon">🔥</div>
                                 </div>
-                                <div class="streak-icon flame-icon">🔥</div>
+                            </div>
+                        </div>
+
+                        <div id="dash-page-2" class="dash-page">
+                            <div class="stats-grid">
+                                <div class="stat-card"><span class="stat-value" id="stat-friends">0</span><span class="stat-label">AMIS</span></div>
+                                <div class="stat-card"><span class="stat-value" id="stat-age">0</span><span class="stat-label">JOURS SUR BEREAL</span></div>
+                                <div class="stat-card">
+                                    <span class="stat-value" id="stat-best-month-name">-</span>
+                                    <span class="stat-label" id="stat-best-month-label">MOIS RECORD</span>
+                                </div>
+                                <div class="stat-card"><span class="stat-value" id="stat-avg-time">--:--</span><span class="stat-label">HEURE MOYENNE</span></div>
+                                <div class="streak-card">
+                                    <div class="streak-content">
+                                        <span class="streak-value" id="stat-join-date" style="font-size: 35px;">--/--/--</span>
+                                        <span class="streak-label">DATE D'ARRIVÉE</span>
+                                    </div>
+                                    <div class="streak-icon calendar-icon">🗓️</div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div id="dash-page-2" class="dash-page">
-                        <div class="stats-grid">
-                            <div class="stat-card"><span class="stat-value" id="stat-friends">0</span><span class="stat-label">AMIS</span></div>
-                            <div class="stat-card"><span class="stat-value" id="stat-age">0</span><span class="stat-label">JOURS SUR BEREAL</span></div>
-                            <div class="stat-card">
-                                <span class="stat-value" id="stat-best-month-name">-</span>
-                                <span class="stat-label" id="stat-best-month-label">MOIS RECORD</span>
-                            </div>
-                            <div class="stat-card"><span class="stat-value" id="stat-avg-time">--:--</span><span class="stat-label">HEURE MOYENNE</span></div>
-                            <div class="streak-card">
-                                <div class="streak-content">
-                                    <span class="streak-value" id="stat-join-date" style="font-size: 35px;">--/--/--</span>
-                                    <span class="streak-label">DATE D'ARRIVÉE</span>
-                                </div>
-                                <div class="streak-icon calendar-icon">🗓️</div>
-                            </div>
-                        </div>
+                <div class="logout-wrapper">
+                    <div id="export-json-btn" class="logout-card-minimal" style="display: none; margin-right: 10px; background: rgba(255, 255, 255, 0.05);">
+                        <span class="logout-label-minimal">Exporter .json</span>
+                    </div>
+
+                    <div class="logout-card-minimal" onclick="handleLogout(event)">
+                        <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
                     </div>
                 </div>
+
             </div>
-
-            <div class="logout-wrapper">
-                <div id="export-json-btn" class="logout-card-minimal" style="display: none; margin-right: 10px; background: rgba(255, 255, 255, 0.05);">
-                    <span class="logout-label-minimal">Exporter .json</span>
-                </div>
-
-                <div class="logout-card-minimal" onclick="handleLogout(event)">
-                    <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
-                </div>
-            </div>
-
         </div>
-        
     </div>
 
 
