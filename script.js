@@ -390,19 +390,17 @@ function updateDashboardUI() {
  * Ouvre le dashboard avec les effets visuels sur la carte
  */
 function openDashboard() {
+    // 1. On récupère les DEUX éléments (l'overlay et le contenu)
     const modal = document.getElementById('dashboard-modal');
+    const content = document.querySelector('.dashboard-content');
     const mapEl = document.getElementById('map');
     const badge = document.querySelector('.user-profile-header');
 
-    currentDashPage = 1; 
-    const p1 = document.getElementById('dash-page-1');
-    const p2 = document.getElementById('dash-page-2');
-    if (p1) p1.style.display = 'block';
-    if (p2) p2.style.display = 'none';
-
+    // 2. On affiche l'overlay ET on force le contenu en flex
     if (modal) modal.style.display = 'flex';
+    if (content) content.style.display = 'flex';
     
-    // On utilise style.transform au lieu de modifier tout le style
+    // 3. Effets sur la carte
     if (mapEl) {
         mapEl.style.transform = 'scale(1.05)';
         mapEl.style.filter = 'blur(3px) brightness(0.4)';
@@ -414,8 +412,6 @@ function openDashboard() {
     }
 
     if (cachedStats) updateDashboardUI();
-
-    
 }
 
 /**

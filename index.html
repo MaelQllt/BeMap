@@ -2,23 +2,29 @@
 <html lang="fr">
 
 <head>
+    <!-- Meta tags pour le responsive design et encodage -->
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
+    <!-- Titre de la page -->
     <title>BeReal Map by maaaël</title>
-    
-    <link rel="icon" href="apple-touch-icon.png">
-    <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="BeReal Map">
-    
-    <meta name="apple-mobile-web-app-startup-image" content="apple-touch-icon.png">
 
+    <!-- Favicon et icônes pour PWA -->
+    <link rel="icon" href="icons/apple-touch-icon.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    
+    <!-- Meta tags pour PWA -->
+    <meta name="mobile-web-app-capable" content="yes"> <meta name="apple-mobile-web-app-capable" content="yes"> <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BeReal Map">
+    <meta name="apple-mobile-web-app-startup-image" content="icons/apple-touch-icon.png">
+
+    <!-- Manifest PWA -->
     <link rel="manifest" href="manifest.json">
+
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     
-    
+    <!-- CSS -->
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="stylesheet" href="css/map.css">
@@ -26,7 +32,7 @@
     <link rel="stylesheet" href="css/profile.css">
     <link rel="stylesheet" href="css/upload.css">
     
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- MapLibre GL JS -->
     <script src="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@3.x/dist/maplibre-gl.css" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
@@ -151,12 +157,14 @@
                 </div>
             </div>
 
-        </div>
-        <div class="logout-wrapper" onclick="handleLogout(event)">
-            <div class="logout-card-minimal">
-                <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
+            <div class="logout-wrapper" onclick="handleLogout(event)">
+                <div class="logout-card-minimal">
+                    <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
+                </div>
             </div>
+
         </div>
+        
     </div>
 
 

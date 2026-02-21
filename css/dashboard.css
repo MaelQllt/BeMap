@@ -1,27 +1,39 @@
 /* DASHBOARD STATS */
 
-.dashboard-content {
-    position: fixed; 
-    top: 0; left: 0; width: 100%; height: 100%;
-    display: none; 
-    justify-content: center; 
+
+
+/* #region 1 DASHBOARD MODAL */
+#dashboard-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.2); /* Un léger voile sombre sur la carte */
+    z-index: 10000;
+    display: none; /* Géré par le JS */
+    justify-content: center;
     align-items: center;
-    z-index: 10001; 
-    background: rgba(0,0,0,0.2);
-    flex-direction: column; /* Aligne le dashboard et le bouton verticalement */
-    gap: 20px; /* Espace entre le dashboard et le bouton de déconnexion */
+    pointer-events: auto; /* Bloque les clics pour la carte derrière */
 }
 
 .dashboard-content {
+    position: fixed; 
+    top: 50%; 
+    left: 50%; 
+    transform: translate(-50%, -50%); /* Centre parfaitement la carte au milieu */
     width: 85%; 
     max-width: 440px;
-    background: rgba(15, 15, 15, 0.85); /* Plus sombre */
+    background: rgba(15, 15, 15, 0.85);
     backdrop-filter: blur(25px) saturate(180%);
     -webkit-backdrop-filter: blur(25px) saturate(180%);
     border-radius: 38px;
     padding: 30px;
     border: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 50px 100px rgba(0, 0, 0, 0.8);
+    z-index: 10001;
+    display: none; /* Changé en 'flex' par le JS */
+    flex-direction: column;
 }
 
 .dashboard-header {
@@ -78,8 +90,10 @@
     transform: rotate(90deg) scale(1.15);
 }
 
+/* #endregion 1 */
 
-/* --- STATS CARDS --- */
+
+/* #region 2 STATS CARDS */
 .stats-grid {
     display: grid; 
     grid-template-columns: 1fr 1fr; 
@@ -154,7 +168,10 @@
     color: #fff; /* Le label devient blanc aussi */
 }
 
+/* #endregion 2 */
 
+
+/* #region 3 STREAK CARDS */
 /* --- STREAK CARDS --- */
 .streak-card {
     grid-column: span 2;
@@ -237,8 +254,10 @@
     100% { transform: scale(1.4) rotate(-8deg); }
 }
 
+/* #endregion 3 */
 
-/* --- NAVIGATION ENTRE LES PAGES --- */
+
+/* #region 4 NAVIGATION ENTRE LES PAGES */
 
 #dash-cards-wrapper {
     overflow: visible; /* CRUCIAL : permet aux cartes de gonfler sans être coupées */
@@ -330,14 +349,18 @@
 .prev-dash { left: -60px; }
 .next-dash { right: -60px; }
 
-/* --- LOGOUT --- */
+/* #endregion 4 */
+
+
+/* #region 5 LOGOUT BTN */
 
 /* Le wrapper devient la zone de détection (Hitbox fixe) */
 .logout-wrapper {
     display: flex;
     justify-content: center;
-    width: 100%;
-    padding: 15px 0; /* Crée une zone de confort autour du bouton */
+    width: fit-content;
+    margin: 0 auto;
+    padding: 15px 0px; /* Crée une zone de confort autour du bouton */
     animation: fadeIn 0.8s ease-out;
     cursor: pointer;
 }
@@ -402,3 +425,5 @@
 .logout-card-minimal:active {
     transform: scale(0.95);
 }
+
+/* #endregion 5 */
