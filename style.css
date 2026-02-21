@@ -856,3 +856,42 @@ body {
 .compass-btn:active svg {
     scale: 1;
 }
+
+
+/* Positionnement à gauche de la boussole */
+.pitch-btn {
+    top: calc(20px + env(safe-area-inset-top)); 
+    right: 73px; 
+    
+}
+
+/* --- COMPASS SVG (Aiguille) --- */
+/* On cible le SVG uniquement quand on survole la boussole (pas le pitch) */
+#north-button:hover svg {
+    transform: scale(1.3); /* Contrôle la taille de la boussole ici */
+}
+
+/* --- PITCH SVG (Flèches) --- */
+/* On cible le SVG uniquement quand on survole le bouton pitch */
+.pitch-btn svg {
+    transform: scale(1.3);
+    overflow: visible; /* Pour éviter que l'arc soit coupé */
+    
+}
+
+/* Pour s'assurer que l'arc est bien dessiné avec le stroke */
+#pitch-arc {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    transition: d 0.1s linear;
+}
+
+#pitch-line {
+    transition: transform 0.1s linear;
+}
+
+/* On peut mettre la ligne de base en opacité réduite pour le style */
+.pitch-btn line:first-child {
+    opacity: 0.3;
+}

@@ -628,17 +628,59 @@ function reAddLayers() {
     map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-opacity': 0, 'circle-radius': 15 } });
 }
 const northBtn = document.getElementById('north-button');
+const pitchBtn = document.getElementById('pitch-button');
 
 // Fonction pour vérifier la visibilité du bouton Nord
 function updateNorthBtnVisibility() {
     const bearing = map.getBearing();
-    const isMapModified = Math.abs(bearing) > 0.5;
+    const pitch = map.getPitch(); 
     
-    // On ne l'affiche que si la carte a bougé ET que les modales sont fermées
+    const isRotated = Math.abs(bearing) > 0.5;
+    const isPitched = pitch > 0.5;
+
     const isDashboardOpen = document.getElementById('dashboard-modal').style.display === 'flex';
     const isPhotoOpen = document.getElementById('bereal-modal').style.display === 'flex';
+    const canShow = !isDashboardOpen && !isPhotoOpen;
 
-    if (isMapModified && !isDashboardOpen && !isPhotoOpen) {
+    // --- GESTION DU BOUTON PITCH ---
+    const pitchBtn = document.getElementById('pitch-button');
+    const pitchLine = document.getElementById('pitch-line');
+    const pitchArc = document.getElementById('pitch-arc');
+
+    if (canShow && isPitched) {
+        pitchBtn.classList.add('visible');
+        
+        if (pitchLine && pitchArc) {
+            // 1. Rotation de la ligne mobile
+            pitchLine.style.transformOrigin = "7px 17px";
+            pitchLine.style.transform = `rotate(${-pitch}deg)`;
+
+            // 2. Dessin de l'arc (Trigonométrie)
+            const radius = 8; // Rayon de l'arc
+            const centerX = 7;
+            const centerY = 17;
+            
+            // Calcul du point d'arrivée de l'arc (en radians)
+            const angleRad = (pitch * Math.PI) / 180;
+            const endX = centerX + radius * Math.cos(-angleRad);
+            const endY = centerY + radius * Math.sin(-angleRad);
+            
+            // Début de l'arc (sur la ligne de sol à droite du pivot)
+            const startX = centerX + radius;
+            const startY = centerY;
+
+            // Création du chemin SVG (Arc)
+            // M = Move to (start), A = Arc to (radiusX radiusY, rotation, largeArcFlag, sweepFlag, endX endY)
+            const d = `M ${startX} ${startY} A ${radius} ${radius} 0 0 0 ${endX} ${endY}`;
+            pitchArc.setAttribute('d', d);
+        }
+    } else {
+        pitchBtn.classList.remove('visible');
+    }
+
+    // --- GESTION DE LA BOUSSOLE ---
+    const northBtn = document.getElementById('north-button');
+    if (isRotated && canShow) {
         northBtn.classList.add('visible');
         northBtn.querySelector('svg').style.transform = `rotate(${-bearing}deg)`;
     } else {
@@ -646,8 +688,9 @@ function updateNorthBtnVisibility() {
     }
 }
 
-// Écouteurs MapLibre
+// Liaison aux événements MapLibre
 map.on('rotate', updateNorthBtnVisibility);
+map.on('pitch', updateNorthBtnVisibility);
 map.on('move', updateNorthBtnVisibility);
 
 // Reset au clic
@@ -657,6 +700,17 @@ northBtn.addEventListener('click', () => {
         duration: 800
     });
 });
+
+// Reset du Pitch au clic
+pitchBtn.addEventListener('click', () => {
+    map.easeTo({
+        pitch: 0,
+        duration: 800
+    });
+});
+
+// Écouteur pour l'inclinaison
+map.on('pitch', updateNorthBtnVisibility);
 
 // #endregion
 
