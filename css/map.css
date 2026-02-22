@@ -189,8 +189,6 @@
 
 /* --- BOUTON TERRAIN / MNT --- */
 
-/* Toujours visible (pas conditionnel comme nord/pitch),
-   discret au repos, plein au survol ou quand actif */
 .map-control-btn--terrain {
     opacity: 0.25 !important;
     transform: scale(1) !important;
@@ -205,8 +203,6 @@
         border-color 0.3s ease !important;
 }
 
-/* Zone de détection élargie via ::before — 30px autour du bouton */
-/* :hover géré par JS (proximité souris) — voir map.js */
 .map-control-btn--terrain:hover,
 .map-control-btn--terrain.nearby {
     opacity: 1 !important;
@@ -222,7 +218,6 @@
     transform: scale(0.95) !important;
 }
 
-/* Actif : toujours pleinement visible */
 .map-control-btn--terrain.active {
     opacity: 1 !important;
     background: rgba(255, 255, 255, 0.15);
@@ -234,4 +229,60 @@
     background: rgba(255, 255, 255, 0.22);
     border-color: rgba(255, 255, 255, 0.6);
     transform: scale(1.1) !important;
+}
+
+/* --- TOAST INLINE CARTE --- */
+.map-toast {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: rgba(20, 20, 22, 0.88);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9999;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.map-toast--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.map-toast--error {
+    background: rgba(160, 30, 30, 0.88);
+    border-color: rgba(255, 80, 80, 0.2);
+}
+
+/* --- LOADER REPOSITIONNEMENT --- */
+.map-stats-loader {
+    position: absolute;
+    top: calc(16px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 22, 0.80);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 9999;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }

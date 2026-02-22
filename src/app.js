@@ -11,11 +11,44 @@ import { initBadge } from './badge.js';
 import { getLocalUrl, syncPWAHeight, setMapRef } from './utils.js';
 import { nextPhoto, prevPhoto, closeModal } from './modal.js';
 
-// Passe la référence de la carte à utils pour que syncPWAHeight puisse appeler map.resize()
 setMapRef(map);
 
+// --- TOAST INLINE CARTE ---
+function showMapToast(message, type = 'success') {
+    const existing = document.getElementById('map-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'map-toast';
+    toast.className = type === 'error' ? 'map-toast map-toast--error' : 'map-toast';
+    toast.innerText = message;
+
+    document.getElementById('map').appendChild(toast);
+
+    // Force reflow pour que la transition CSS s'applique
+    toast.getBoundingClientRect();
+    toast.classList.add('map-toast--visible');
+
+    setTimeout(() => { toast.classList.remove('map-toast--visible'); }, 2200);
+    setTimeout(() => { toast.remove(); }, 2700);
+}
+
+// --- LOADER STATS ---
+function showStatsLoader(visible) {
+    let loader = document.getElementById('stats-loader');
+    if (visible) {
+        if (loader) return;
+        loader = document.createElement('div');
+        loader.id = 'stats-loader';
+        loader.className = 'map-stats-loader';
+        loader.innerText = 'Repositionnement en cours…';
+        document.getElementById('map').appendChild(loader);
+    } else {
+        loader?.remove();
+    }
+}
+
 // --- DÉMARRAGE ANTICIPÉ ---
-// Affiche le loader immédiatement si une session est déjà active (avant tout rendu)
 if (localStorage.getItem('bereal_session_active') === 'true') {
     document.getElementById('loading-screen').style.display = 'flex';
     document.getElementById('upload-overlay').style.display = 'none';
@@ -24,14 +57,14 @@ if (localStorage.getItem('bereal_session_active') === 'true') {
 }
 
 // --- CONVERSION MEMORIES → GEOJSON ---
-// Transforme les données brutes de l'archive en Features MapLibre
 export function convertMemoriesToGeoJSON(data) {
-    const momentCounts = {};
+    const seenIds = new Set();
     return data.map(m => {
-        // Détecte les BeReal Bonus (deuxième photo du même moment)
-        const momentId = m.berealMoment || (m.takenTime ? m.takenTime.split('T')[0] : m.date);
-        const isBonus = !!momentCounts[momentId];
-        momentCounts[momentId] = true;
+        // Utilise berealMoment en priorité, sinon takenTime complet (timestamp précis) pour éviter
+        // les faux positifs entre deux BeReal distincts tombant le même jour
+        const momentId = m.berealMoment || m.takenTime || m.date;
+        const isBonus = seenIds.has(momentId);
+        seenIds.add(momentId);
 
         const lng = parseFloat(m.location?.longitude);
         const lat = parseFloat(m.location?.latitude);
@@ -40,15 +73,17 @@ export function convertMemoriesToGeoJSON(data) {
             type: 'Feature',
             geometry: { type: 'Point', coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] },
             properties: {
-                front:   getLocalUrl(m.frontImage?.path),
-                back:    getLocalUrl(m.backImage?.path),
-                caption: m.caption || "",
+                front:    getLocalUrl(m.frontImage?.path),
+                back:     getLocalUrl(m.backImage?.path),
+                caption:  m.caption || "",
                 location: m.location,
-                rawDate: m.takenTime,
-                date: m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                time: m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                isLate:  m.isLate,
-                isBonus: isBonus
+                rawDate:  m.takenTime,
+                // ID unique stable pour la relocation (takenTime + index dans le tableau original)
+                uid:      m.uid ?? m.takenTime,
+                date:     m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
+                time:     m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
+                isLate:   m.isLate,
+                isBonus:  isBonus,
             }
         };
     });
@@ -84,64 +119,79 @@ async function initApp(userData, memoriesData, friendsData) {
 }
 
 // --- REPOSITIONNEMENT D'UN BEREAL ---
-// Activé par le bouton "Replacer" dans la modale
 map.on('click', async (e) => {
     if (!isRelocating || !memoryToUpdate) return;
 
     const { lng, lat } = e.lngLat;
-    const index = allMemoriesData.findIndex(m => m.takenTime === memoryToUpdate.rawDate);
-    if (index === -1) return;
 
-    // Mise à jour en mémoire et en session
+    // Recherche par uid en priorité, fallback rawDate — évite les collisions sur timestamp identique
+    const index = allMemoriesData.findIndex(m =>
+        (m.uid != null && m.uid === memoryToUpdate.uid) ||
+        m.takenTime === memoryToUpdate.rawDate
+    );
+    if (index === -1) {
+        showMapToast("Souvenir introuvable.", 'error');
+        return;
+    }
+
     allMemoriesData[index].location = { latitude: lat, longitude: lng };
     const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
     await saveFileToSession("memories.json", blob);
 
-    // Refresh carte + bouton export
     refreshMapMarkers(allMemoriesData, convertMemoriesToGeoJSON);
     checkDifferencesAndShowExport();
 
-    // Recalcul des stats géographiques (on invalide le cache d'abord)
+    showStatsLoader(true);
     try {
-        const userData = JSON.parse(await fileMap['user.json'].text());
+        const userData    = JSON.parse(await fileMap['user.json'].text());
         const friendsData = fileMap['friends.json'] ? JSON.parse(await fileMap['friends.json'].text()) : [];
         setCachedStats(null);
         await calculateStats(allMemoriesData, userData, friendsData);
     } catch (err) {
         console.error("Erreur recalcul stats:", err);
+        showMapToast("Erreur lors du recalcul des stats.", 'error');
+    } finally {
+        showStatsLoader(false);
     }
 
     setIsRelocating(false);
     document.getElementById('map').style.cursor = '';
-    alert("Position mise à jour !");
+    showMapToast("Position mise à jour.");
 });
 
 // --- UPLOAD INITIAL ---
 document.getElementById('folder-input').addEventListener('change', async (e) => {
-    const files = e.target.files;
+    const files = Array.from(e.target.files);
     const statusMsg = document.getElementById('status-msg');
     const newFileMap = {};
-    let count = 0;
 
+    // Indexation du fileMap en mémoire (pas de I/O ici)
     for (const file of files) {
         const path = file.webkitRelativePath.split('/').slice(1).join('/');
         newFileMap[path] = file;
-        await saveFileToSession(path, file);
-        count++;
-        if (count % 25 === 0) {
-            statusMsg.innerText = `Création de la session... (${Math.round((count / files.length) * 100)}%)`;
-        }
     }
+
+    // Sauvegarde en session par batches de 25 fichiers en parallèle
+    const BATCH_SIZE = 25;
+    const entries = Object.entries(newFileMap);
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+        const batch = entries.slice(i, i + BATCH_SIZE);
+        await Promise.all(batch.map(([path, file]) => saveFileToSession(path, file)));
+        statusMsg.innerText = `Création de la session... (${Math.round(((i + batch.length) / entries.length) * 100)}%)`;
+    }
+
     setFileMap(newFileMap);
 
     try {
         const memoriesFile = newFileMap['memories.json'];
-        // Sauvegarde une copie originale pour détecter les modifications (bouton export)
         await saveFileToSession("memories_original.json", memoriesFile);
 
-        const userData    = JSON.parse(await newFileMap['user.json'].text());
+        const userData     = JSON.parse(await newFileMap['user.json'].text());
         const memoriesData = JSON.parse(await memoriesFile.text());
-        const friendsData  = JSON.parse(await newFileMap['friends.json'].text());
+        // Fix : fallback [] si friends.json absent, comme dans l'auto-login
+        const friendsData  = newFileMap['friends.json']
+            ? JSON.parse(await newFileMap['friends.json'].text())
+            : [];
 
         setAllMemoriesData(memoriesData);
         localStorage.setItem('bereal_session_active', 'true');
@@ -154,9 +204,8 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
 });
 
 // --- AUTO-LOGIN ---
-// Restaure la session depuis IndexedDB si elle existe
 async function handleAutoLogin() {
-    const loader       = document.getElementById('loading-screen');
+    const loader        = document.getElementById('loading-screen');
     const uploadOverlay = document.getElementById('upload-overlay');
 
     try {
@@ -166,7 +215,7 @@ async function handleAutoLogin() {
             setFileMap(savedFiles);
             uploadOverlay.style.display = 'none';
 
-            const userData    = JSON.parse(await savedFiles['user.json'].text());
+            const userData     = JSON.parse(await savedFiles['user.json'].text());
             const memoriesData = JSON.parse(await savedFiles['memories.json'].text());
             const friendsData  = savedFiles['friends.json'] ? JSON.parse(await savedFiles['friends.json'].text()) : [];
             setAllMemoriesData(memoriesData);
@@ -194,7 +243,6 @@ async function handleAutoLogin() {
 
 // --- RACCOURCIS CLAVIER ---
 document.addEventListener('keydown', (e) => {
-    // Bloque le scroll natif du browser sur les touches directionnelles
     if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 
     const modal = document.getElementById('bereal-modal');
@@ -202,7 +250,15 @@ document.addEventListener('keydown', (e) => {
         if (e.key === 'ArrowRight') nextPhoto();
         if (e.key === 'ArrowLeft')  prevPhoto();
         if (e.key === 'Escape')     closeModal();
-        return; // On n'écoute pas le dashboard si la modale photo est ouverte
+        return;
+    }
+
+    // Annulation du mode relocation via Échap
+    if (e.key === 'Escape' && isRelocating) {
+        setIsRelocating(false);
+        document.getElementById('map').style.cursor = '';
+        showMapToast("Repositionnement annulé.");
+        return;
     }
 
     const dash = document.getElementById('dashboard-modal');
@@ -217,3 +273,6 @@ document.addEventListener('keydown', (e) => {
 initBadge();
 initDashboard();
 handleAutoLogin();
+
+window.__memories = allMemoriesData;
+console.log(window.__memories[0]);
