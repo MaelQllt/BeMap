@@ -1,6 +1,6 @@
 /* --- CARTE --- */
 #map { 
-    position: fixed; /* Fixed est plus stable que absolute pour les PWA */
+    position: fixed;
     top: 0; 
     left: 0; 
     width: 100%; 
@@ -9,10 +9,7 @@
     z-index: 0;
 }
 
-
 /* --- MARQUEURS MAPLIBRE --- */
-
-/* L'ancre gérée par MapLibre (on ne touche pas au transform ici) */
 .marker-anchor {
     width: auto;
     height: auto;
@@ -21,14 +18,7 @@
     justify-content: center;
     z-index: 1;
 }
-
-/* On monte le z-index de toute l'ancre au survol pour qu'il passe devant les autres */
-.marker-anchor:hover {
-    z-index: 999;
-}
-
-
-/* --- MEMORIES SUR LA CARTE (POINTS & CLUSTERS --- */
+.marker-anchor:hover { z-index: 999; }
 
 /* --- POINT SEUL --- */
 .custom-point-marker {
@@ -42,33 +32,25 @@
     transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
     pointer-events: auto;
 }
-
-/* ZONE DE CLICK ÉTENDUE */
 .custom-point-marker::after {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 40px; 
-    height: 40px;
+    width: 40px; height: 40px;
     border-radius: 50%;
     background: transparent;
     cursor: pointer;
 }
-
-/* AU SURVOL : On fait gonfler l'élément interne uniquement */
 .marker-anchor:hover .custom-point-marker {
     transform: scale(1.4); 
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 -3px 4px rgba(0, 0, 0, 0.2);
 }
 
-
 /* --- CLUSTERS --- */
 .custom-cluster-label {
     position: relative;
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     background-color: #151517;
     color: white;
     font-family: 'Inter', sans-serif;
@@ -82,23 +64,16 @@
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-/* ZONE DE CLICK ÉTENDUE POUR CLUSTER */
 .custom-cluster-label::after {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 50%;
+    top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    /* Zone de 60px pour un cluster de 36px */
-    width: 60px;
-    height: 60px;
+    width: 60px; height: 60px;
     border-radius: 50%;
     background: transparent;
     cursor: pointer;
 }
-
-/* AU SURVOL : On fait gonfler l'élément interne uniquement */
 .marker-anchor:hover .custom-cluster-label {
     transform: scale(1.2);
     font-weight: 700;
@@ -107,10 +82,7 @@
     box-shadow: 0 10px 20px rgba(0, 0, 0, 0.9), inset 0 -4px 6px rgba(0, 0, 0, 0.4);
 }
 
-
-
-/* --- CONTRÔLES DE LA CARTE (BOUSSOLE, PITCH) --- */
-
+/* --- CONTRÔLES DE LA CARTE --- */
 .map-controls {
     position: fixed;
     top: calc(20px + env(safe-area-inset-top));
@@ -121,15 +93,24 @@
     z-index: 1000;
     pointer-events: none;
     height: 40px;
+    transition: filter 0.7s cubic-bezier(0.19, 1, 0.22, 1), z-index 0s;
 }
 
-/* --- STYLE DE BASE DU BOUTON --- */
+.map-controls.frozen {
+    filter: blur(3px) brightness(0.4);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.map-controls:not(.frozen) {
+    filter: none;
+    z-index: 1000;
+}
+
 .map-control-btn {
     position: relative;
-    width: 36px;
-    height: 36px;
+    width: 36px; height: 36px;
     margin-left: 12px;
-    
     border-radius: 50%;
     background: rgba(15, 15, 17, 0.7);
     backdrop-filter: blur(12px);
@@ -141,14 +122,11 @@
     justify-content: center;
     cursor: pointer;
     pointer-events: auto;
-
-    /* État de base invisible/rétracté */
     opacity: 0;
     transform: scale(0);
     min-width: 0; 
     flex-shrink: 0;
     overflow: hidden;
-
     transition: 
         opacity 0.4s ease, 
         transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275),
@@ -157,7 +135,6 @@
         background 0.3s ease;
 }
 
-/* --- ÉTAT VISIBLE --- */
 .map-control-btn.visible {
     opacity: 1;
     transform: scale(1);
@@ -175,50 +152,30 @@
     pointer-events: none;
 }
 
-/* --- GESTION DES SVG --- */
 .map-control-btn svg {
     min-width: 20px;
     height: 20px;
-    transition: transform 0.3s ease, scale 0.3s ease; /* Ajout transition scale pour fluidité */
+    transition: transform 0.3s ease, scale 0.3s ease;
 }
 
-/* Grossissement indépendant au hover du BOUTON */
 .map-control-btn:hover {
     background: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.4);
     transform: scale(1.1);
 }
 
-/* 1. Survol Boussole : La flèche grossit à 1.3 */
-.map-control-btn--compass:hover svg {
-    scale: 1.3;
-}
+.map-control-btn--compass:hover svg { scale: 1.3; }
 
-/* 2. Pitch : Déjà à 1.3 par défaut, grossit encore plus au survol si désiré (ex: 1.5) */
-/* Sinon, supprime le sélecteur :hover ci-dessous pour le garder fixe */
 .map-control-btn--pitch svg {
     transform: scale(1.3);
     overflow: visible;
 }
+.map-control-btn--pitch:hover svg { scale: 1.3; }
 
-.map-control-btn--pitch:hover svg {
-    scale: 1.3; /* On peut mettre 1.4 ou 1.5 ici pour un effet indépendant */
-}
+.map-control-btn:active { transform: scale(0.95); }
+.map-control-btn:active svg { scale: 1; transform: scale(1); }
 
-/* --- ÉTAT ACTIF (CLIC) --- */
-.map-control-btn:active {
-    transform: scale(0.95);
-}
-
-.map-control-btn:active svg {
-    scale: 1;
-    transform: scale(1);
-}
-
-/* --- DÉTAILS INTERNES PITCH --- */
-.pitch-line-bg {
-    opacity: 0.3;
-}
+.pitch-line-bg { opacity: 0.3; }
 
 #pitch-arc {
     fill: none;
@@ -227,7 +184,54 @@
     transition: d 0.1s linear;
     opacity: 0.8;
 }
+#pitch-line { transition: transform 0.1s linear; }
 
-#pitch-line {
-    transition: transform 0.1s linear;
+
+/* --- BOUTON TERRAIN / MNT --- */
+
+/* Toujours visible (pas conditionnel comme nord/pitch),
+   discret au repos, plein au survol ou quand actif */
+.map-control-btn--terrain {
+    opacity: 0.25 !important;
+    transform: scale(1) !important;
+    width: 36px !important;
+    margin-left: 12px !important;
+    pointer-events: auto !important;
+    border-width: 1px !important;
+    transition: 
+        opacity 0.35s ease,
+        transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+        background 0.3s ease,
+        border-color 0.3s ease !important;
+}
+
+/* Zone de détection élargie via ::before — 30px autour du bouton */
+/* :hover géré par JS (proximité souris) — voir map.js */
+.map-control-btn--terrain:hover,
+.map-control-btn--terrain.nearby {
+    opacity: 1 !important;
+    transform: scale(1.1) !important;
+}
+
+.map-control-btn--terrain:hover svg {
+    transform: scale(1.3);
+    overflow: visible;
+}
+
+.map-control-btn--terrain:active {
+    transform: scale(0.95) !important;
+}
+
+/* Actif : toujours pleinement visible */
+.map-control-btn--terrain.active {
+    opacity: 1 !important;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: #ffffff;
+}
+
+.map-control-btn--terrain.active:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.6);
+    transform: scale(1.1) !important;
 }

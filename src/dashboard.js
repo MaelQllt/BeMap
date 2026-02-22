@@ -2,74 +2,75 @@
  * DASHBOARD.JS — Statistiques & Dashboard
  */
 
-import { cachedStats, setCachedStats, worldGeoCache, depsGeoCache, setWorldGeoCache, setDepsGeoCache, isUiLocked, allMemoriesData, objectUrlCache } from './state.js';
+import { cachedStats, setCachedStats, worldGeoCache, depsGeoCache, setWorldGeoCache, setDepsGeoCache, allMemoriesData, objectUrlCache } from './state.js';
 import { clearSession } from './db.js';
 import { setMapFocus } from './map.js';
 
+// Re-exporté pour que app.js puisse invalider le cache après une relocation
 export { setCachedStats } from './state.js';
 
+// Verrou anti-spam pendant l'animation du slider
+let isAnimatingDash = false;
+
+// Fait glisser le slider vers la page suivante ou précédente
 export function switchDash(direction = 'right') {
     if (isAnimatingDash) return;
     isAnimatingDash = true;
 
     const slider = document.getElementById('dash-slider');
-    const animDuration = 400;
-    const unlockDelay = 300;
+    const DURATION = 400;
 
-    slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+    slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
 
     if (direction === 'right') {
         slider.style.transform = 'translateX(-50%)';
         setTimeout(() => {
             slider.style.transition = 'none';
-            slider.appendChild(slider.firstElementChild);
+            slider.appendChild(slider.firstElementChild); // Boucle la page vue à la fin
             slider.style.transform = 'translateX(0%)';
-        }, animDuration);
+        }, DURATION);
     } else {
+        // Pour aller à gauche : on prépend la dernière page et on anime depuis -50%
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
         slider.style.transform = 'translateX(-50%)';
-        slider.offsetHeight;
-        slider.style.transition = `transform ${animDuration}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+        slider.offsetHeight; // Force un reflow pour que la transition parte bien de -50%
+        slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         slider.style.transform = 'translateX(0%)';
     }
 
-    setTimeout(() => { isAnimatingDash = false; }, unlockDelay);
+    setTimeout(() => { isAnimatingDash = false; }, DURATION);
 }
 
+// Calcule toutes les statistiques depuis les données brutes
+// Le cache est invalidé par setCachedStats(null) avant d'appeler cette fonction
 export async function calculateStats(data, userData, friendsData) {
     if (cachedStats && cachedStats.total === data.length) {
         updateDashboardUI();
         return;
     }
     try {
-        // 1. STREAK
-        const days = data.filter(m => m.date).map(m => m.date.split('T')[0]).sort();
-        const uniqueDays = [...new Set(days)];
-        let maxStreak = 0, currentStreak = 0;
+        // 1. STREAK — jours consécutifs max
+        const uniqueDays = [...new Set(data.filter(m => m.takenTime).map(m => m.takenTime.split('T')[0]))].sort();
+        let maxStreak = 0, streak = 0;
         for (let i = 0; i < uniqueDays.length; i++) {
-            if (i === 0) currentStreak = 1;
-            else {
-                const diffDays = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
-                if (diffDays === 1) currentStreak++;
-                else { maxStreak = Math.max(maxStreak, currentStreak); currentStreak = 1; }
-            }
-            maxStreak = Math.max(maxStreak, currentStreak);
+            if (i === 0) { streak = 1; continue; }
+            const diff = Math.round((new Date(uniqueDays[i]) - new Date(uniqueDays[i - 1])) / 86400000);
+            if (diff === 1) streak++;
+            else { maxStreak = Math.max(maxStreak, streak); streak = 1; }
         }
+        maxStreak = Math.max(maxStreak, streak);
 
-        // 2. PONCTUALITÉ
+        // 2. PONCTUALITÉ — % de moments postés à l'heure
         const momentIds = [...new Set(data.map(m => m.berealMoment || m.takenTime?.split('T')[0]))];
-        let onTimeCount = 0;
-        momentIds.forEach(id => {
-            if (data.some(m => (m.berealMoment === id || m.takenTime?.split('T')[0] === id) && m.isLate === false)) {
-                onTimeCount++;
-            }
-        });
+        const onTimeCount = momentIds.filter(id =>
+            data.some(m => (m.berealMoment === id || m.takenTime?.split('T')[0] === id) && m.isLate === false)
+        ).length;
         const percent = momentIds.length > 0 ? Math.round((onTimeCount / momentIds.length) * 100) : 0;
 
-        // 3. GÉOGRAPHIE
+        // 3. GÉOGRAPHIE — pays et départements visités
         const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
-        const uniqueGeoPoints = validMemories.map(m => [m.location.longitude, m.location.latitude]);
+        const geoPoints = validMemories.map(m => [m.location.longitude, m.location.latitude]);
 
         if (!worldGeoCache || !depsGeoCache) {
             const [respWorld, respDeps] = await Promise.all([
@@ -82,71 +83,57 @@ export async function calculateStats(data, userData, friendsData) {
 
         const foundCountries = new Set();
         const foundDeps = new Set();
-
-        uniqueGeoPoints.forEach(coords => {
+        geoPoints.forEach(coords => {
             const pt = turf.point(coords);
-            for (let c of worldGeoCache.features) {
-                if (turf.booleanPointInPolygon(pt, c)) {
-                    foundCountries.add(c.properties.ADMIN || c.properties.name);
-                    break;
-                }
+            for (const c of worldGeoCache.features) {
+                if (turf.booleanPointInPolygon(pt, c)) { foundCountries.add(c.properties.ADMIN || c.properties.name); break; }
             }
+            // Box approximative France métropolitaine pour limiter les calculs
             if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 52) {
-                for (let d of depsGeoCache.features) {
-                    if (turf.booleanPointInPolygon(pt, d)) {
-                        foundDeps.add(d.properties.nom);
-                        break;
-                    }
+                for (const d of depsGeoCache.features) {
+                    if (turf.booleanPointInPolygon(pt, d)) { foundDeps.add(d.properties.nom); break; }
                 }
             }
         });
 
-        // 4. SOCIAL & ANCIENNETÉ
+        // 4. ANCIENNETÉ
         const joinDate = userData.createdAt ? new Date(userData.createdAt) : new Date();
-        const today = new Date();
-        const diffDays = Math.floor((today - joinDate) / (1000 * 60 * 60 * 24));
-        const formattedJoinDate = joinDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+        const daysOld = Math.floor((new Date() - joinDate) / 86400000);
+        const joinDateStr = joinDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
 
         // 5. MOIS RECORD & HEURE MOYENNE
         const monthCounts = {};
-        let totalMinutes = 0;
-        let validTimeCount = 0;
-
+        let totalMinutes = 0, validTimeCount = 0;
         data.forEach(m => {
-            if (m.takenTime) {
-                const d = new Date(m.takenTime);
-                let monthKey = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-                monthKey = monthKey.charAt(0).toUpperCase() + monthKey.slice(1);
-                monthCounts[monthKey] = (monthCounts[monthKey] || 0) + 1;
-                totalMinutes += (d.getHours() * 60) + d.getMinutes();
-                validTimeCount++;
-            }
+            if (!m.takenTime) return;
+            const d = new Date(m.takenTime);
+            const key = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+            monthCounts[key] = (monthCounts[key] || 0) + 1;
+            totalMinutes += d.getHours() * 60 + d.getMinutes();
+            validTimeCount++;
         });
 
-        let bestMonthName = "-";
-        let maxPhotos = 0;
+        let bestMonthName = "-", maxPhotos = 0;
         for (const [month, count] of Object.entries(monthCounts)) {
-            if (count > maxPhotos) { maxPhotos = count; bestMonthName = month; }
+            if (count > maxPhotos) { maxPhotos = count; bestMonthName = month.charAt(0).toUpperCase() + month.slice(1); }
         }
 
         let avgTimeStr = "--:--";
         if (validTimeCount > 0) {
-            const avgMinutesTotal = totalMinutes / validTimeCount;
-            const hh = Math.floor(avgMinutesTotal / 60);
-            const mm = Math.round(avgMinutesTotal % 60);
-            avgTimeStr = `${hh}H${mm.toString().padStart(2, '0')}`;
+            const avg = totalMinutes / validTimeCount;
+            avgTimeStr = `${Math.floor(avg / 60)}H${Math.round(avg % 60).toString().padStart(2, '0')}`;
         }
 
-        // 6. CACHE
+        // 6. MISE EN CACHE
         setCachedStats({
             total: data.length,
             percent,
             countries: foundCountries.size || (validMemories.length > 0 ? 1 : 0),
             deps: foundDeps.size,
             maxStreak,
-            friends: friendsData ? friendsData.length : 0,
-            daysOld: diffDays,
-            joinDate: formattedJoinDate,
+            friends: friendsData?.length ?? 0,
+            daysOld,
+            joinDate: joinDateStr,
             bestMonthName,
             bestMonthLabel: `MOIS RECORD (${maxPhotos} BEREALS)`,
             avgTime: avgTimeStr
@@ -154,28 +141,29 @@ export async function calculateStats(data, userData, friendsData) {
 
         updateDashboardUI();
     } catch (e) {
-        console.error("Erreur calcul stats détaillé:", e);
+        console.error("Erreur calcul stats:", e);
     }
 }
 
+// Injecte les valeurs calculées dans le DOM du dashboard
 export function updateDashboardUI() {
     if (!cachedStats) return;
     const mapping = {
-        'stat-streak': cachedStats.total,
-        'stat-ontime': `${cachedStats.percent}%`,
-        'stat-countries': cachedStats.countries,
-        'stat-deps': cachedStats.deps,
-        'stat-max-streak': cachedStats.maxStreak,
-        'stat-friends': cachedStats.friends,
-        'stat-age': cachedStats.daysOld,
-        'stat-join-date': cachedStats.joinDate,
+        'stat-streak':          cachedStats.total,
+        'stat-ontime':          `${cachedStats.percent}%`,
+        'stat-countries':       cachedStats.countries,
+        'stat-deps':            cachedStats.deps,
+        'stat-max-streak':      cachedStats.maxStreak,
+        'stat-friends':         cachedStats.friends,
+        'stat-age':             cachedStats.daysOld,
+        'stat-join-date':       cachedStats.joinDate,
         'stat-best-month-name': cachedStats.bestMonthName,
-        'stat-best-month-label': cachedStats.bestMonthLabel,
-        'stat-avg-time': cachedStats.avgTime.toUpperCase()
+        'stat-best-month-label':cachedStats.bestMonthLabel,
+        'stat-avg-time':        cachedStats.avgTime.toUpperCase()
     };
-    for (let id in mapping) {
+    for (const [id, value] of Object.entries(mapping)) {
         const el = document.getElementById(id);
-        if (el) el.innerText = mapping[id];
+        if (el) el.innerText = value;
     }
 }
 
@@ -192,25 +180,27 @@ export function closeDashboard() {
     setMapFocus(false);
 }
 
+// Attache tous les listeners du dashboard (appelé une seule fois au démarrage)
 export function initDashboard() {
     document.querySelector('.prev-dash')?.addEventListener('click', () => switchDash('left'));
     document.querySelector('.next-dash')?.addEventListener('click', () => switchDash('right'));
     document.querySelector('.close-dash')?.addEventListener('click', closeDashboard);
 
-    // Logout — il y a deux .logout-card-minimal (export + logout), on prend le dernier
-    const logoutBtns = document.querySelectorAll('.logout-card-minimal');
-    const logoutBtn = logoutBtns[logoutBtns.length - 1];
-    logoutBtn?.addEventListener('click', handleLogout);
+    // Ferme en cliquant sur le fond (overlay), pas sur la carte elle-même
+    document.getElementById('dashboard-modal')?.addEventListener('click', (e) => {
+        if (e.target === document.getElementById('dashboard-modal')) closeDashboard();
+    });
 
-    // Export JSON
+    // Il y a deux .logout-card-minimal dans le HTML (export + déconnexion) — on prend le dernier
+    const logoutBtns = document.querySelectorAll('.logout-card-minimal');
+    logoutBtns[logoutBtns.length - 1]?.addEventListener('click', handleLogout);
+
     document.getElementById('export-json-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!allMemoriesData || allMemoriesData.length === 0) return;
-        const blob = new Blob([JSON.stringify(allMemoriesData, null, 2)], { type: "application/json" });
+        if (!allMemoriesData?.length) return;
+        const blob = new Blob([JSON.stringify(allMemoriesData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = "memories.json";
+        const link = Object.assign(document.createElement('a'), { href: url, download: 'memories.json' });
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -219,16 +209,15 @@ export function initDashboard() {
 }
 
 async function handleLogout(event) {
-    if (event) event.stopPropagation();
-    if (confirm("Voulez-vous vraiment vous déconnecter et supprimer les données locales ?")) {
-        try {
-            await clearSession();
-        } catch (e) {
-            console.error("Erreur clearSession:", e);
-        }
-        localStorage.removeItem('bereal_session_active');
-        objectUrlCache.forEach(url => URL.revokeObjectURL(url));
-        objectUrlCache.clear();
-        window.location.reload();
+    event?.stopPropagation();
+    if (!confirm("Voulez-vous vraiment vous déconnecter et supprimer les données locales ?")) return;
+    try {
+        await clearSession();
+    } catch (e) {
+        console.error("Erreur clearSession:", e);
     }
+    localStorage.removeItem('bereal_session_active');
+    objectUrlCache.forEach(url => URL.revokeObjectURL(url));
+    objectUrlCache.clear();
+    window.location.reload();
 }

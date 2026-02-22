@@ -1,5 +1,5 @@
 /**
- * MODAL.JS — Modale photo BeReal, flip, zoom & pan
+ * MODAL.JS — Modale photo BeReal : navigation, flip, drag miniature, zoom & pan
  */
 
 import {
@@ -16,16 +16,19 @@ import {
     translateY, setTranslateY,
     lastMouseX, setLastMouseX,
     lastMouseY, setLastMouseY,
-    isRelocating, setIsRelocating,
-    memoryToUpdate, setMemoryToUpdate
+    setIsRelocating,
+    setMemoryToUpdate
 } from './state.js';
 import { setMapFocus } from './map.js';
 import { syncPWAHeight } from './utils.js';
 
-const miniBox = document.getElementById('mini-img-box');
-const mainPhoto = document.getElementById('main-photo');
+const miniBox       = document.getElementById('mini-img-box');
+const mainPhoto     = document.getElementById('main-photo');
 const photoContainer = document.getElementById('photo-container');
-const modal = document.getElementById('bereal-modal');
+const modal         = document.getElementById('bereal-modal');
+const counter       = document.getElementById('photo-counter');
+
+// --- OUVERTURE / FERMETURE ---
 
 export function openModal(photos) {
     setCurrentPhotos(photos);
@@ -37,10 +40,10 @@ export function openModal(photos) {
 }
 
 export function closeModal() {
+    // On ne ferme pas si un drag ou un zoom vient de se terminer (évite les faux clics)
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
     setCurrentMiniSide('left');
-    const counter = document.getElementById('photo-counter');
     if (counter) {
         counter.style.left = 'auto';
         counter.style.right = '20px';
@@ -50,38 +53,47 @@ export function closeModal() {
     syncPWAHeight();
 }
 
+// --- CONTENU ---
+
 export function updateModalContent() {
     const p = currentPhotos[currentIndex];
     const replaceBtn = document.getElementById('replace-button');
-    if (replaceBtn) replaceBtn.style.setProperty('display', 'none', 'important');
+
+    // On cache le bouton replacer par défaut (sera affiché si nécessaire plus bas)
+    replaceBtn?.style.setProperty('display', 'none', 'important');
     if (!p) return;
 
+    // Normalisation de la localisation (peut être une string JSON sérialisée par MapLibre)
     let loc = p.location;
     if (typeof loc === 'string') {
-        try { loc = JSON.parse(loc); } catch (e) { loc = null; }
+        try { loc = JSON.parse(loc); } catch { loc = null; }
     }
 
     setIsFlipped(false);
     resetZoomState();
 
+    // Mise à jour des images et métadonnées
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption || "";
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
+
+    // Bandeau vert "à l'heure" (seulement si c'est un vrai BeReal, pas un Bonus)
     photoContainer.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
 
-    const hasValidLocation = loc && loc.latitude && loc.longitude && loc.latitude !== 0;
+    // Bouton replacer : visible seulement si la localisation est absente ou nulle
+    const hasValidLocation = loc?.latitude && loc?.longitude && loc.latitude !== 0;
     if (replaceBtn) replaceBtn.style.display = hasValidLocation ? 'none' : 'block';
 
+    // Position de la miniature (respecte le côté choisi par l'utilisateur)
     miniBox.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
-    const xPos = currentMiniSide === 'right' ? (photoContainer.offsetWidth - miniBox.offsetWidth - 28) : 0;
+    const xPos = currentMiniSide === 'right' ? photoContainer.offsetWidth - miniBox.offsetWidth - 28 : 0;
     miniBox.style.transform = `translate(${xPos}px, 0px)`;
 
+    // Navigation flèches et compteur
     const hasMultiple = currentPhotos.length > 1;
     document.getElementById('prevBtn').style.display = (hasMultiple && currentIndex > 0) ? 'flex' : 'none';
     document.getElementById('nextBtn').style.display = (hasMultiple && currentIndex < currentPhotos.length - 1) ? 'flex' : 'none';
-
-    const counter = document.getElementById('photo-counter');
     if (counter) counter.innerText = hasMultiple ? `${currentIndex + 1}/${currentPhotos.length}` : '';
 }
 
@@ -100,10 +112,13 @@ export function prevPhoto() {
 }
 
 // --- DRAG MINIATURE & FLIP ---
+
 miniBox.addEventListener('mousedown', (e) => {
     setIsDragging(true);
     setHasDragged(false);
-    const rect = miniBox.getBoundingClientRect(), cRect = photoContainer.getBoundingClientRect();
+    const rect = miniBox.getBoundingClientRect();
+    const cRect = photoContainer.getBoundingClientRect();
+    // On stocke l'offset initial du drag sur l'élément DOM directement (pas besoin de state)
     miniBox._dragStartX = e.clientX - (rect.left - cRect.left);
     miniBox._dragStartY = e.clientY - (rect.top - cRect.top);
     miniBox.style.transition = 'none';
@@ -114,9 +129,9 @@ miniBox.addEventListener('mousedown', (e) => {
 document.addEventListener('mousemove', (e) => {
     if (isDragging) {
         setHasDragged(true);
-        const clampedX = Math.max(10, Math.min(e.clientX - miniBox._dragStartX, photoContainer.offsetWidth - miniBox.offsetWidth - 10));
-        const clampedY = Math.max(10, Math.min(e.clientY - miniBox._dragStartY, photoContainer.offsetHeight - miniBox.offsetHeight - 10));
-        miniBox.style.transform = `translate(${clampedX - 14}px, ${clampedY - 14}px)`;
+        const x = Math.max(10, Math.min(e.clientX - miniBox._dragStartX, photoContainer.offsetWidth - miniBox.offsetWidth - 10));
+        const y = Math.max(10, Math.min(e.clientY - miniBox._dragStartY, photoContainer.offsetHeight - miniBox.offsetHeight - 10));
+        miniBox.style.transform = `translate(${x - 14}px, ${y - 14}px)`;
     }
     if (isZooming) handlePan(e.clientX, e.clientY);
 });
@@ -124,40 +139,48 @@ document.addEventListener('mousemove', (e) => {
 document.addEventListener('mouseup', () => {
     if (isDragging) {
         setIsDragging(false);
+
         if (!hasDragged) {
+            // Tap simple → flip avant/arrière
             const newFlipped = !isFlipped;
             setIsFlipped(newFlipped);
             const p = currentPhotos[currentIndex];
             mainPhoto.src = newFlipped ? p.front : p.back;
             document.getElementById('mini-photo').src = newFlipped ? p.back : p.front;
         } else {
+            // Drag terminé → snap gauche ou droite
             setJustFinishedDrag(true);
             miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth / 2) > (photoContainer.getBoundingClientRect().left + photoContainer.offsetWidth / 2);
+            const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth / 2) >
+                              (photoContainer.getBoundingClientRect().left + photoContainer.offsetWidth / 2);
             setCurrentMiniSide(snapRight ? 'right' : 'left');
-            miniBox.style.transform = snapRight ? `translate(${photoContainer.offsetWidth - miniBox.offsetWidth - 28}px, 0px)` : 'translate(0px, 0px)';
+            miniBox.style.transform = snapRight
+                ? `translate(${photoContainer.offsetWidth - miniBox.offsetWidth - 28}px, 0px)`
+                : 'translate(0px, 0px)';
 
-            const counter = document.getElementById('photo-counter');
+            // Animation du compteur vers le côté opposé à la miniature
             if (counter) {
-                if (snapRight) counter.classList.add('from-left'); else counter.classList.remove('from-left');
+                counter.classList.toggle('from-left', snapRight);
                 counter.classList.add('switching');
                 setTimeout(() => {
-                    if (snapRight) { counter.style.left = '20px'; counter.style.right = 'auto'; }
-                    else { counter.style.left = 'auto'; counter.style.right = '20px'; }
+                    counter.style.left  = snapRight ? '20px' : 'auto';
+                    counter.style.right = snapRight ? 'auto' : '20px';
                     counter.classList.remove('switching');
                 }, 150);
             }
             setTimeout(() => setJustFinishedDrag(false), 500);
         }
     }
+
     if (isZooming) {
         setJustFinishedDrag(true);
-        resetZoomState();
-        setTimeout(() => setJustFinishedDrag(false), 300);
+        smoothResetZoom();
+        setTimeout(() => setJustFinishedDrag(false), 350);
     }
 });
 
-// --- ZOOM ---
+// --- ZOOM & PAN ---
+
 function updateTransform() {
     const maxTx = (photoContainer.offsetWidth * (zoomScale - 1)) / 2;
     const maxTy = (photoContainer.offsetHeight * (zoomScale - 1)) / 2;
@@ -166,23 +189,39 @@ function updateTransform() {
     mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
 }
 
+// Reset instantané — utilisé lors du changement de photo ou fermeture de modale
 export function resetZoomState() {
     setIsZooming(false);
     setZoomScale(1);
     setTranslateX(0);
     setTranslateY(0);
+    mainPhoto.style.transition = 'none';
     mainPhoto.style.transform = 'scale(1) translate(0,0)';
     photoContainer.classList.remove('zoomed');
 }
 
+// Reset animé — utilisé au mouseup après un pan, repart depuis la position courante
+function smoothResetZoom() {
+    setIsZooming(false); // Coupé immédiatement pour bloquer tout re-déclenchement
+    mainPhoto.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    mainPhoto.style.transform = 'scale(1) translate(0,0)';
+    photoContainer.classList.remove('zoomed');
+    setTimeout(() => {
+        setZoomScale(1);
+        setTranslateX(0);
+        setTranslateY(0);
+        mainPhoto.style.transition = 'none';
+    }, 300);
+}
+
 function startZoom(x, y) {
     setIsZooming(true);
-    mainPhoto.style.transformOrigin = `50% 50%`;
     setLastMouseX(x);
     setLastMouseY(y);
     setTranslateX(0);
     setTranslateY(0);
     setZoomScale(1.6);
+    mainPhoto.style.transformOrigin = '50% 50%';
     mainPhoto.style.transition = 'transform 0.25s ease-out';
     updateTransform();
     photoContainer.classList.add('zoomed');
@@ -209,11 +248,8 @@ document.getElementById('replace-button')?.addEventListener('click', () => {
     document.getElementById('map').style.cursor = 'crosshair';
 });
 
-// --- NAVIGATION FLÈCHES ---
+// --- NAVIGATION ---
 document.getElementById('prevBtn')?.addEventListener('click', prevPhoto);
 document.getElementById('nextBtn')?.addEventListener('click', nextPhoto);
 
-// Fermer en cliquant sur fond
-modal?.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-});
+modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });

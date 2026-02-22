@@ -2,9 +2,10 @@
  * MAP.JS — Gestion de la carte MapLibre, layers et contrôles
  */
 
-import { clusterMarkers, setClusterMarkers, isUiLocked, setIsUiLocked, allMemoriesData, isRelocating, memoryToUpdate, setIsRelocating } from './state.js';
+import { clusterMarkers, setClusterMarkers, isUiLocked, setIsUiLocked } from './state.js';
 import { openModal } from './modal.js';
 
+// Rayon de clustering courant (change selon le zoom)
 export let currentRadiusMode = 60;
 
 // --- INITIALISATION DE LA CARTE ---
@@ -14,6 +15,7 @@ export const map = new maplibregl.Map({
     center: [2.21, 46.22],
     zoom: 5.5,
     maxZoom: 17,
+    maxPitch: 85,
     pitch: 0,
     antialias: true
 });
@@ -21,64 +23,127 @@ export const map = new maplibregl.Map({
 // --- BÂTIMENTS 3D ---
 export function setup3DBuildings() {
     const sourceId = map.getSource('openmaptiles') ? 'openmaptiles' : 'maptiler_planet';
-    if (!map.getLayer('3d-buildings')) {
-        map.addLayer({
-            'id': '3d-buildings',
-            'source': sourceId,
-            'source-layer': 'building',
-            'type': 'fill-extrusion',
-            'minzoom': 15,
-            'paint': {
-                'fill-extrusion-color': '#2a2a2b',
-                'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 20],
-                'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
-                'fill-extrusion-opacity': 0,
-                'fill-extrusion-opacity-transition': { duration: 500 }
-            }
-        });
-    }
+    if (map.getLayer('3d-buildings')) return;
+    map.addLayer({
+        id: '3d-buildings',
+        source: sourceId,
+        'source-layer': 'building',
+        type: 'fill-extrusion',
+        minzoom: 15,
+        paint: {
+            'fill-extrusion-color': '#2a2a2b',
+            'fill-extrusion-height': ['coalesce', ['get', 'render_height'], ['get', 'height'], 20],
+            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], ['get', 'min_height'], 0],
+            'fill-extrusion-opacity': 0,
+            'fill-extrusion-opacity-transition': { duration: 500 }
+        }
+    });
 }
 
 function update3DVisibility() {
     if (!map.getLayer('3d-buildings')) return;
-    const pitch = map.getPitch();
-    const zoom = map.getZoom();
-    const shouldShow = pitch > 25 && zoom > 15;
+    const shouldShow = map.getPitch() > 25 && map.getZoom() > 16;
     const targetOpacity = shouldShow ? 0.8 : 0;
-    const currentOpacity = map.getPaintProperty('3d-buildings', 'fill-extrusion-opacity');
-    if (currentOpacity !== targetOpacity) {
+    if (map.getPaintProperty('3d-buildings', 'fill-extrusion-opacity') !== targetOpacity) {
         map.setPaintProperty('3d-buildings', 'fill-extrusion-opacity', targetOpacity);
     }
 }
 
-map.on('style.load', () => setup3DBuildings());
-map.on('move', update3DVisibility);
+// --- TERRAIN / MNT ---
+let terrainEnabled = false;
 
-// --- FOCUS MAP (flou quand une modale est ouverte) ---
+export function toggleTerrain() {
+    terrainEnabled = !terrainEnabled;
+    const btn = document.getElementById('terrain-button');
+
+    if (terrainEnabled) {
+        if (!map.getSource('hillshade-source')) {
+            map.addSource('hillshade-source', {
+                type: 'raster-dem',
+                url: 'https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=iYlIQdqzuS2kKjZemTWi',
+                tileSize: 256
+            });
+        }
+        if (!map.getSource('terrain-source')) {
+            map.addSource('terrain-source', {
+                type: 'raster-dem',
+                url: 'https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=iYlIQdqzuS2kKjZemTWi',
+                tileSize: 512
+            });
+        }
+
+        if (!map.getLayer('hillshade-layer')) {
+            const firstSymbol = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
+            map.addLayer({
+                id: 'hillshade-layer',
+                type: 'hillshade',
+                source: 'hillshade-source',
+                paint: {
+                    'hillshade-shadow-color':           '#000000',
+                    'hillshade-highlight-color':        '#ffffff',
+                    'hillshade-accent-color':           '#000000',
+                    'hillshade-illumination-direction': 335,
+                    'hillshade-exaggeration':           0.45,
+                    'hillshade-illumination-anchor':    'map'
+                }
+            }, firstSymbol);
+        } else {
+            map.setLayoutProperty('hillshade-layer', 'visibility', 'visible');
+        }
+
+        map.setTerrain({ source: 'terrain-source', exaggeration: 1.3 });
+        btn?.classList.add('active');
+    } else {
+        if (map.getLayer('hillshade-layer')) {
+            map.setLayoutProperty('hillshade-layer', 'visibility', 'none');
+        }
+        map.setTerrain(null);
+        btn?.classList.remove('active');
+    }
+}
+
+export function setupTerrain() {
+    // Terrain activé à la demande via toggleTerrain()
+}
+
+map.on('style.load', () => { setup3DBuildings(); setupTerrain(); });
+['moveend', 'pitchend', 'zoomend'].forEach(evt => map.on(evt, update3DVisibility));
+
+// --- FOCUS MAP ---
 export function setMapFocus(isFocus) {
     setIsUiLocked(isFocus);
     const mapEl = document.getElementById('map');
     const badge = document.querySelector('.user-profile-header');
+    const controls = document.querySelector('.map-controls');
 
     if (isFocus) {
         mapEl.style.transform = 'scale(1.05)';
         mapEl.style.filter = 'blur(5px) brightness(0.4)';
         badge.style.filter = 'blur(3px)';
         badge.style.pointerEvents = 'none';
-        [northBtn, pitchBtn].forEach(btn => btn?.classList.remove('visible'));
+        controls?.classList.add('frozen');
     } else {
         mapEl.style.transform = 'scale(1)';
         mapEl.style.filter = 'none';
         badge.style.filter = 'none';
         badge.style.pointerEvents = 'auto';
+        controls?.classList.remove('frozen');
         updateMapControls();
     }
 }
 
 // --- LAYERS ---
 export function reAddLayers() {
-    map.addLayer({ id: 'clusters', type: 'circle', source: 'bereal-src', filter: ['has', 'point_count'], paint: { 'circle-color': '#151517', 'circle-radius': 18, 'circle-stroke-width': 1, 'circle-stroke-color': '#d9d9d960' } });
-    map.addLayer({ id: 'unclustered-point', type: 'circle', source: 'bereal-src', filter: ['!', ['has', 'point_count']], paint: { 'circle-opacity': 0, 'circle-radius': 15 } });
+    map.addLayer({
+        id: 'clusters', type: 'circle', source: 'bereal-src',
+        filter: ['has', 'point_count'],
+        paint: { 'circle-opacity': 0, 'circle-radius': 0 }
+    });
+    map.addLayer({
+        id: 'unclustered-point', type: 'circle', source: 'bereal-src',
+        filter: ['!', ['has', 'point_count']],
+        paint: { 'circle-opacity': 0, 'circle-radius': 0 }
+    });
 }
 
 export function setupMapLayers(features) {
@@ -88,18 +153,15 @@ export function setupMapLayers(features) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features },
         cluster: true,
-        clusterMaxZoom: 22,
-        clusterRadius: 50
+        clusterMaxZoom: 17,
+        clusterRadius: currentRadiusMode
     });
 
     reAddLayers();
 
-    // Markers HTML personnalisés
     map.on('render', () => {
         const newMarkers = {};
-        const featuresOnScreen = map.querySourceFeatures('bereal-src');
-
-        for (const feature of featuresOnScreen) {
+        for (const feature of map.querySourceFeatures('bereal-src')) {
             const coords = feature.geometry.coordinates;
             const props = feature.properties;
             const id = props.cluster ? `c-${props.cluster_id}` : `p-${coords.join(',')}`;
@@ -112,7 +174,31 @@ export function setupMapLayers(features) {
                 inner.className = props.cluster ? 'custom-cluster-label' : 'custom-point-marker';
                 if (props.cluster) inner.innerText = props.point_count;
                 el.appendChild(inner);
-                clusterMarkers[id] = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(coords).addTo(map);
+
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (props.cluster) {
+                        const currentZoom = map.getZoom();
+                        map.getSource('bereal-src').getClusterExpansionZoom(props.cluster_id, (err, expansionZoom) => {
+                            if (err) return;
+                            const isNullIsland = Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1;
+                            const MAX_ZOOM = 16;
+                            const willExpand = expansionZoom <= MAX_ZOOM && !isNullIsland;
+                            if (willExpand) {
+                                map.easeTo({ center: coords, zoom: Math.min(expansionZoom, MAX_ZOOM) });
+                            } else {
+                                map.getSource('bereal-src').getClusterLeaves(props.cluster_id, Infinity, 0, (err2, leaves) => {
+                                    if (!err2) openModal(leaves.map(l => l.properties).sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate)));
+                                });
+                            }
+                        });
+                    } else {
+                        openModal([props]);
+                    }
+                });
+
+                clusterMarkers[id] = new maplibregl.Marker({ element: el, anchor: 'center' })
+                    .setLngLat(coords).addTo(map);
             }
         }
         for (const id in clusterMarkers) {
@@ -120,34 +206,14 @@ export function setupMapLayers(features) {
         }
     });
 
-    // Clics clusters
-    map.on('click', 'clusters', (e) => {
-        const f = map.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
-        const clusterId = f.properties.cluster_id;
-        const coords = f.geometry.coordinates;
-        const currentZoom = map.getZoom();
-
-        if ((Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1) || currentZoom >= 16) {
-            map.getSource('bereal-src').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-                if (!err) openModal(leaves.map(l => l.properties).sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate)));
-            });
-        } else {
-            map.getSource('bereal-src').getClusterExpansionZoom(clusterId, (err, zoom) => {
-                if (!err) map.easeTo({ center: coords, zoom: Math.min(zoom, 16.5) });
-            });
-        }
-    });
-
-    map.on('click', 'unclustered-point', (e) => openModal([e.features[0].properties]));
     map.on('mouseenter', 'clusters', () => map.getCanvas().style.cursor = 'pointer');
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
 }
 
+// Reconstruit complètement la source et les layers
 export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     Object.values(clusterMarkers).forEach(m => m.remove());
     setClusterMarkers({});
-
-    const newFeatures = convertMemoriesToGeoJSON(data);
 
     if (map.getSource('bereal-src')) {
         if (map.getLayer('clusters')) map.removeLayer('clusters');
@@ -157,9 +223,9 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
 
     map.addSource('bereal-src', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features: JSON.parse(JSON.stringify(newFeatures)) },
+        data: { type: 'FeatureCollection', features: convertMemoriesToGeoJSON(data) },
         cluster: true,
-        clusterMaxZoom: 22,
+        clusterMaxZoom: 17,
         clusterRadius: currentRadiusMode
     });
 
@@ -167,10 +233,11 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     map.triggerRepaint();
 }
 
+// Ajuste le rayon de clustering selon le niveau de zoom
 export function watchZoomRadius(data, refreshFn) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
-        const newRadius = zoom >= 16 ? 80 : 50;
+        const newRadius = zoom >= 14 ? 100 : 50;
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
             refreshFn(data);
@@ -178,45 +245,60 @@ export function watchZoomRadius(data, refreshFn) {
     });
 }
 
-// --- CONTRÔLES CARTE (Nord/Pitch) ---
-const northBtn = document.getElementById('north-button');
-const pitchBtn = document.getElementById('pitch-button');
-const pitchLine = document.getElementById('pitch-line');
-const pitchArc = document.getElementById('pitch-arc');
-const northIcon = northBtn?.querySelector('svg');
+// --- CONTRÔLES CARTE ---
+const northBtn   = document.getElementById('north-button');
+const pitchBtn   = document.getElementById('pitch-button');
+const terrainBtn = document.getElementById('terrain-button');
+const pitchLine  = document.getElementById('pitch-line');
+const pitchArc   = document.getElementById('pitch-arc');
+const northIcon  = northBtn?.querySelector('svg');
+
+terrainBtn?.classList.add('visible');
 
 function getPitchArcPath(pitch) {
-    const radius = 8, centerX = 7, centerY = 17;
-    const angleRad = (pitch * Math.PI) / 180;
-    const endX = centerX + radius * Math.cos(-angleRad);
-    const endY = centerY + radius * Math.sin(-angleRad);
-    return `M ${centerX + radius} ${centerY} A ${radius} ${radius} 0 0 0 ${endX} ${endY}`;
+    const radius = 8, cx = 7, cy = 17;
+    const rad = (pitch * Math.PI) / 180;
+    const endX = cx + radius * Math.cos(-rad);
+    const endY = cy + radius * Math.sin(-rad);
+    return `M ${cx + radius} ${cy} A ${radius} ${radius} 0 0 0 ${endX} ${endY}`;
 }
 
 export function updateMapControls() {
     if (isUiLocked) return;
     const bearing = map.getBearing();
-    const pitch = map.getPitch();
-    const isRotated = Math.abs(bearing) > 0.5;
-    const isPitched = pitch > 0.5;
+    const pitch   = map.getPitch();
 
-    if (isPitched) {
-        pitchBtn?.classList.add('visible');
-        if (pitchLine) { pitchLine.style.transformOrigin = "7px 17px"; pitchLine.style.transform = `rotate(${-pitch}deg)`; }
-        if (pitchArc) pitchArc.setAttribute('d', getPitchArcPath(pitch));
-    } else {
-        pitchBtn?.classList.remove('visible');
-    }
-
-    if (isRotated) {
+    if (Math.abs(bearing) > 0.5) {
         northBtn?.classList.add('visible');
         if (northIcon) northIcon.style.transform = `rotate(${-bearing}deg)`;
     } else {
         northBtn?.classList.remove('visible');
     }
+
+    if (pitch > 0.5) {
+        pitchBtn?.classList.add('visible');
+        if (pitchLine) { pitchLine.style.transformOrigin = '7px 17px'; pitchLine.style.transform = `rotate(${-pitch}deg)`; }
+        if (pitchArc) pitchArc.setAttribute('d', getPitchArcPath(pitch));
+    } else {
+        pitchBtn?.classList.remove('visible');
+    }
+    terrainBtn?.classList.add('visible');
 }
 
 ['rotate', 'pitch', 'move'].forEach(evt => map.on(evt, updateMapControls));
 
 northBtn?.addEventListener('click', () => { map.easeTo({ bearing: 0, duration: 800 }); setTimeout(updateMapControls, 10); });
 pitchBtn?.addEventListener('click', () => map.easeTo({ pitch: 0, duration: 800 }));
+document.getElementById('terrain-button')?.addEventListener('click', toggleTerrain);
+
+// --- PROXIMITÉ SOURIS BOUTON TERRAIN ---
+const TERRAIN_PROXIMITY_PX = 80;
+
+document.addEventListener('mousemove', (e) => {
+    if (!terrainBtn) return;
+    const rect = terrainBtn.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+    terrainBtn.classList.toggle('nearby', dist < TERRAIN_PROXIMITY_PX);
+});
