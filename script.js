@@ -112,6 +112,9 @@ let worldGeoCache = null;
 let depsGeoCache = null;
 let isUiLocked = false;
 
+// Variables URL
+let objectUrlCache = new Map(); // Permet de stocker et réutiliser les URLs
+
 // #endregion
 
 
@@ -991,37 +994,36 @@ document.getElementById('replace-button').addEventListener('click', () => {
 function getLocalUrl(jsonPath) {
     if (!jsonPath) return "";
     
-    // 1. On nettoie le chemin (enlève le slash initial)
     let cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
-    
-    // 2. Stratégie de recherche :
-    // On essaie d'abord le chemin exact fourni par le JSON
-    if (fileMap[cleanPath]) {
-        return URL.createObjectURL(fileMap[cleanPath]);
+
+    // --- NOUVEAU : On vérifie si on a déjà créé une URL pour ce fichier ---
+    if (objectUrlCache.has(cleanPath)) {
+        return objectUrlCache.get(cleanPath);
     }
 
-    // 3. Si non trouvé, on simplifie le chemin pour correspondre à l'archive standard
-    // On extrait juste le nom du fichier (ex: image.webp)
-    const parts = cleanPath.split('/');
-    const fileName = parts[parts.length - 1];
-
-    // On cherche si le fichier existe dans Photos/post, Photos/profile ou Photos/bereal
-    const foldersToTry = ["Photos/post/", "Photos/profile/", "Photos/bereal/"];
-    
-    for (let folder of foldersToTry) {
-        if (fileMap[folder + fileName]) {
-            return URL.createObjectURL(fileMap[folder + fileName]);
+    // Stratégie de recherche du fichier dans fileMap
+    let file = null;
+    if (fileMap[cleanPath]) {
+        file = fileMap[cleanPath];
+    } else {
+        const fileName = cleanPath.split('/').pop();
+        const foldersToTry = ["Photos/post/", "Photos/profile/", "Photos/bereal/"];
+        for (let folder of foldersToTry) {
+            if (fileMap[folder + fileName]) {
+                file = fileMap[folder + fileName];
+                break;
+            }
         }
     }
 
-    // 4. Cas particulier : chemin avec l'ID utilisateur au milieu (ton cas actuel)
-    // Photos/ID_USER/bereal/nom.webp -> Photos/bereal/nom.webp
-    if (cleanPath.includes('/bereal/')) {
-        const simplifiedBereal = "Photos/bereal/" + fileName;
-        if (fileMap[simplifiedBereal]) return URL.createObjectURL(fileMap[simplifiedBereal]);
+    if (file) {
+        // On crée l'URL, on la stocke dans le cache, puis on la retourne
+        const newUrl = URL.createObjectURL(file);
+        objectUrlCache.set(cleanPath, newUrl);
+        return newUrl;
     }
 
-    console.warn("Fichier non trouvé dans l'archive :", cleanPath);
+    console.warn("Fichier non trouvé :", cleanPath);
     return "";
 }
 
@@ -1309,11 +1311,15 @@ async function handleLogout(event) {
             
             tx.oncomplete = () => {
                 localStorage.removeItem('bereal_session_active'); // Nettoie le flag
+                objectUrlCache.forEach(url => URL.revokeObjectURL(url));
+                objectUrlCache.clear();
                 window.location.reload(); // Retour à l'accueil
             };
         } catch (err) {
             console.error("Erreur déconnexion:", err);
-            localStorage.clear();
+            localStorage.removeItem('bereal_session_active');
+            objectUrlCache.forEach(url => URL.revokeObjectURL(url));
+            objectUrlCache.clear();
             window.location.reload();
         }
     }
