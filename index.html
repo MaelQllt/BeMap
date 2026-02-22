@@ -71,12 +71,12 @@
 
 
     <!-- BeReal. -->
-    <div id="bereal-modal" onclick="closeModal()">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <button id="prevBtn" class="nav-arrow prev" onclick="prevPhoto()">
+    <div id="bereal-modal">
+        <div class="modal-content">
+            <button id="prevBtn" class="nav-arrow prev">
                 <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
-            <button id="nextBtn" class="nav-arrow next" onclick="nextPhoto()">
+            <button id="nextBtn" class="nav-arrow next">
                 <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
             </button>
 
@@ -104,22 +104,22 @@
 
 
     <!-- Dashboard des stats, nombre de pays visités, départements, nombre de BeReals, % à l'heure, best streak-->
-    <div id="dashboard-modal" class="modal-overlay" onclick="closeDashboard()">
+    <div id="dashboard-modal" class="modal-overlay">
         <div class="dashboard-positioner">
-            <div class="dashboard-content" onclick="event.stopPropagation()">
+            <div class="dashboard-content">
                 <div class="dashboard-blur-bg"></div> 
                 
-                <button class="dash-nav prev-dash" onclick="switchDash('left')">
+                <button class="dash-nav prev-dash">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
-                <button class="dash-nav next-dash" onclick="switchDash('right')">
+                <button class="dash-nav next-dash">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </button>
 
                 <!-- HEADER FIXE : ne bouge jamais -->
                 <div class="dashboard-header">
                     <span class="dashboard-title">My BeReal.</span>
-                    <button class="close-dash" onclick="closeDashboard()">×</button>
+                    <button class="close-dash">×</button>
                 </div>
 
                 <!-- ZONE ANIMÉE : seules les cards roulent -->
@@ -167,7 +167,7 @@
                         <span class="logout-label-minimal">Exporter .json</span>
                     </div>
 
-                    <div class="logout-card-minimal" onclick="handleLogout(event)">
+                    <div class="logout-card-minimal">
                         <span class="logout-label-minimal">Déconnexion / Changer d'archive</span>
                     </div>
                 </div>
@@ -193,6 +193,7 @@
     </button>
 </div>
 
-    <script src="script.js"></script>
+
+    <script type="module" src="src/app.js"></script>
 </body>
 </html>
