@@ -273,6 +273,3 @@ document.addEventListener('keydown', (e) => {
 initBadge();
 initDashboard();
 handleAutoLogin();
-
-window.__memories = allMemoriesData;
-console.log(window.__memories[0]);
