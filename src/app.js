@@ -10,6 +10,8 @@ import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDa
 import { initBadge } from './badge.js';
 import { getLocalUrl, syncPWAHeight, setMapRef } from './utils.js';
 import { nextPhoto, prevPhoto, closeModal } from './modal.js';
+import { initTimeline, applyFiltersToMap } from './timeline.js';
+import { initFilters, buildFiltersUI, closeFilters } from './filters.js';
 
 setMapRef(map);
 
@@ -106,7 +108,7 @@ async function initApp(userData, memoriesData, friendsData) {
         const injectFeatures = () => {
             if (!map.getSource('bereal-src')) {
                 setupMapLayers(features);
-                watchZoomRadius(allMemoriesData, (data) => refreshMapMarkers(data, convertMemoriesToGeoJSON));
+                watchZoomRadius(() => applyFiltersToMap());
             }
         };
         if (map.loaded()) injectFeatures();
@@ -114,6 +116,7 @@ async function initApp(userData, memoriesData, friendsData) {
     }
 
     calculateStats(memoriesData, userData, friendsData);
+    buildFiltersUI();
     setup3DBuildings();
     syncPWAHeight();
 }
@@ -261,6 +264,11 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
+    // Fermeture des panels via Échap
+    if (e.key === 'Escape') {
+        closeFilters();
+    }
+
     const dash = document.getElementById('dashboard-modal');
     if (dash?.style.display === 'flex') {
         if (e.key === 'ArrowRight') switchDash('right');
@@ -272,4 +280,6 @@ document.addEventListener('keydown', (e) => {
 // --- INIT ---
 initBadge();
 initDashboard();
+initTimeline();
+initFilters();
 handleAutoLogin();

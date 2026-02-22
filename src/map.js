@@ -210,6 +210,15 @@ export function setupMapLayers(features) {
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
 }
 
+// Mise à jour légère : change uniquement les données GeoJSON sans reconstruire la source
+// Utilisé par la timeline pour des transitions fluides
+export function updateMapData(features) {
+    const src = map.getSource('bereal-src');
+    if (src) {
+        src.setData({ type: 'FeatureCollection', features });
+    }
+}
+
 // Reconstruit complètement la source et les layers
 export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     Object.values(clusterMarkers).forEach(m => m.remove());
@@ -233,14 +242,15 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     map.triggerRepaint();
 }
 
-// Ajuste le rayon de clustering selon le niveau de zoom
-export function watchZoomRadius(data, refreshFn) {
+// Ajuste le rayon de clustering selon le niveau de zoom.
+// onRadiusChange() est appelé sans argument — le caller fournit les données filtrées courantes.
+export function watchZoomRadius(onRadiusChange) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
         const newRadius = zoom >= 14 ? 100 : 50;
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
-            refreshFn(data);
+            onRadiusChange();
         }
     });
 }
