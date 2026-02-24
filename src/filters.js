@@ -28,6 +28,12 @@ export function initFilters() {
     // Ferme automatiquement si un modal BeReal ou Dashboard s'ouvre
     document.addEventListener('app:modal-open', closeFilters);
 
+    // Raccourci clavier F
+    document.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'F' || e.key === 'f') toggleFilters();
+    });
+
     // Clic en dehors = replie (pas ferme)
     document.addEventListener('click', (e) => {
         if (!isFiltersOpen) return;

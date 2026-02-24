@@ -22,19 +22,21 @@ export function switchDash(direction = 'right') {
 
     slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
 
+    // Avec 3 pages en 300% de large, chaque page occupe 33.333%
+    const STEP = 33.333;
+
     if (direction === 'right') {
-        slider.style.transform = 'translateX(-50%)';
+        slider.style.transform = `translateX(-${STEP}%)`;
         setTimeout(() => {
             slider.style.transition = 'none';
-            slider.appendChild(slider.firstElementChild); // Boucle la page vue à la fin
+            slider.appendChild(slider.firstElementChild);
             slider.style.transform = 'translateX(0%)';
         }, DURATION);
     } else {
-        // Pour aller à gauche : on prépend la dernière page et on anime depuis -50%
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
-        slider.style.transform = 'translateX(-50%)';
-        slider.offsetHeight; // Force un reflow pour que la transition parte bien de -50%
+        slider.style.transform = `translateX(-${STEP}%)`;
+        slider.offsetHeight;
         slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         slider.style.transform = 'translateX(0%)';
     }
@@ -148,6 +150,18 @@ export async function calculateStats(data, userData, friendsData) {
             }
         }
 
+        // Prépare les données mensuelles pour le graphique (triées chronologiquement)
+        const monthlyChartData = Object.entries(monthCounts)
+            .map(([label, count]) => {
+                // Reconstruit une date depuis le label "janvier 2023"
+                const parts = label.split(' ');
+                const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+                const monthIdx  = MONTHS_FR.indexOf(parts[0].toLowerCase());
+                const year      = parseInt(parts[1]);
+                return { label, count, sortKey: year * 12 + monthIdx };
+            })
+            .sort((a, b) => a.sortKey - b.sortKey);
+
         let avgTimeStr = "--:--";
         if (validTimeCount > 0) {
             const avg = totalMinutes / validTimeCount;
@@ -166,7 +180,8 @@ export async function calculateStats(data, userData, friendsData) {
             joinDate: joinDateStr,
             bestMonthName,
             bestMonthLabel: `MOIS RECORD (${maxPhotos} BEREALS)`,
-            avgTime: avgTimeStr
+            avgTime:          avgTimeStr,
+            monthlyChartData: monthlyChartData
         });
 
         updateDashboardUI();
@@ -177,6 +192,168 @@ export async function calculateStats(data, userData, friendsData) {
 }
 
 // Injecte les valeurs calculées dans le DOM du dashboard
+// --- GRAPHIQUE MENSUEL (canvas pur + tooltip hover) ---
+
+// Cache des positions de barres pour le hit-test au hover
+let _chartBarRects = [];
+let _chartCanvas   = null;
+
+function drawMonthlyChart(data, hoveredIndex = -1) {
+    const canvas = document.getElementById('monthly-chart');
+    if (!canvas || !data || !data.length) return;
+    _chartCanvas = canvas;
+    const ctx    = canvas.getContext('2d');
+    const dpr    = window.devicePixelRatio || 1;
+    const W      = canvas.offsetWidth;
+    const H      = canvas.offsetHeight;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+
+    const padL = 28, padR = 16, padT = 16, padB = 36;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+    const maxVal = Math.max(...data.map(d => d.count), 1);
+    const n      = data.length;
+    const barW   = Math.max(2, Math.floor(chartW / n) - 2);
+    const gap    = (chartW - barW * n) / (n + 1);
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Lignes de grille horizontales
+    const gridLines = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.lineWidth   = 1;
+    for (let i = 0; i <= gridLines; i++) {
+        const y = padT + chartH - (i / gridLines) * chartH;
+        ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+    }
+
+    // Barres
+    _chartBarRects = [];
+    data.forEach((d, i) => {
+        const x      = padL + gap + i * (barW + gap);
+        const barH   = (d.count / maxVal) * chartH;
+        const y      = padT + chartH - barH;
+        const isHov  = i === hoveredIndex;
+
+        _chartBarRects.push({ x, y: padT, w: barW, h: chartH, dataY: y, dataH: barH, index: i });
+
+        // Zone de surbrillance verticale au hover
+        if (isHov) {
+            ctx.fillStyle = 'rgba(255,255,255,0.06)';
+            ctx.fillRect(x - 2, padT, barW + 4, chartH);
+        }
+
+        const grad = ctx.createLinearGradient(0, y, 0, padT + chartH);
+        if (isHov) {
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(1, 'rgba(255,255,255,0.3)');
+        } else {
+            grad.addColorStop(0, 'rgba(255,255,255,0.85)');
+            grad.addColorStop(1, 'rgba(255,255,255,0.15)');
+        }
+        ctx.fillStyle = grad;
+
+        const r = Math.min(3, barW / 2);
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + barW - r, y);
+        ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
+        ctx.lineTo(x + barW, padT + chartH);
+        ctx.lineTo(x, padT + chartH);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+
+        // Valeur au-dessus de la barre hover
+        if (isHov) {
+            const label  = d.count.toString();
+            const textX  = x + barW / 2;
+            const textY  = y - 5;
+            ctx.font      = 'bold 11px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            // Halo pour lisibilité
+            ctx.fillStyle = 'rgba(0,0,0,0.5)';
+            ctx.fillText(label, textX + 0.5, textY + 0.5);
+            ctx.fillStyle = '#fff';
+            ctx.fillText(label, textX, textY);
+        }
+    });
+
+    // Labels axe X : affiche l'année quand elle change
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font      = `${Math.max(8, Math.min(10, Math.floor(chartW / n * 0.9)))}px Inter, sans-serif`;
+    ctx.textAlign = 'center';
+    let lastYear  = null;
+    data.forEach((d, i) => {
+        const x    = padL + gap + i * (barW + gap) + barW / 2;
+        const year = d.label.split(' ')[1];
+        if (year !== lastYear) {
+            const isHov = i === hoveredIndex;
+            ctx.fillStyle = isHov ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)';
+            ctx.fillText(year, x, H - 6);
+            lastYear = year;
+        }
+    });
+
+    // Valeur max en haut
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font      = '9px Inter, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(maxVal, padL - 2, padT + 4);
+
+    // Tooltip mois — centré en haut du graphique, au-dessus des barres
+    if (hoveredIndex >= 0 && hoveredIndex < data.length) {
+        const d       = data[hoveredIndex];
+        const label   = d.label.charAt(0).toUpperCase() + d.label.slice(1);
+        const tooltip = `${label}  ·  ${d.count} BeReal${d.count > 1 ? 's' : ''}`;
+        ctx.font      = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        const tx = W / 2;
+        const ty = 15;
+        // Fond pill
+        const tw = ctx.measureText(tooltip).width;
+        ctx.fillStyle = 'rgba(255,255,255,0.1)';
+        const pillX = tx - tw / 2 - 8;
+        const pillH = 18;
+        ctx.beginPath();
+        ctx.roundRect(pillX, ty - 13, tw + 16, pillH, 6);
+        ctx.fill();
+        // Texte
+        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillText(tooltip, tx, ty);
+    }
+}
+
+// Initialise le listener mousemove/mouseleave sur le canvas pour le hover
+function initChartHover(data) {
+    const canvas = document.getElementById('monthly-chart');
+    if (!canvas || canvas._hoverInited) return;
+    canvas._hoverInited = true;
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect   = canvas.getBoundingClientRect();
+        const mx     = e.clientX - rect.left;
+        const my     = e.clientY - rect.top;
+        let found    = -1;
+        for (const bar of _chartBarRects) {
+            if (mx >= bar.x && mx <= bar.x + bar.w && my >= bar.y && my <= bar.y + bar.h) {
+                found = bar.index;
+                break;
+            }
+        }
+        canvas.style.cursor = found >= 0 ? 'crosshair' : 'default';
+        drawMonthlyChart(data, found);
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        canvas.style.cursor = 'default';
+        drawMonthlyChart(data, -1);
+    });
+}
+
 export function updateDashboardUI() {
     if (!cachedStats) return;
     const mapping = {
@@ -196,6 +373,14 @@ export function updateDashboardUI() {
         const el = document.getElementById(id);
         if (el) el.innerText = value;
     }
+
+    // Graphique mensuel
+    if (cachedStats?.monthlyChartData) {
+        requestAnimationFrame(() => {
+            drawMonthlyChart(cachedStats.monthlyChartData);
+            initChartHover(cachedStats.monthlyChartData);
+        });
+    }
 }
 
 export function openDashboard() {
@@ -207,18 +392,25 @@ export function openDashboard() {
         slider.style.transition = 'none';
         slider.style.transform  = 'translateX(0%)';
         // Si des pages ont été réorganisées par les boucles de switchDash, remet l'ordre
-        const wrapper = slider;
-        const pages   = Array.from(wrapper.children);
-        const page1   = pages.find(p => p.id === 'dash-page-1' || p.querySelector('#stat-countries'));
-        const page2   = pages.find(p => p.id === 'dash-page-2' || p.querySelector('#stat-friends'));
-        if (page1 && page2 && wrapper.firstElementChild !== page1) {
-            wrapper.innerHTML = '';
-            wrapper.appendChild(page1);
-            wrapper.appendChild(page2);
+        // Remet les 3 pages dans l'ordre original (le carrousel réordonne le DOM)
+        const p1 = slider.querySelector('#dash-page-1');
+        const p2 = slider.querySelector('#dash-page-2');
+        const p3 = slider.querySelector('#dash-page-3');
+        if (p1 && p2 && p3) {
+            slider.appendChild(p1);
+            slider.appendChild(p2);
+            slider.appendChild(p3);
         }
     }
     setMapFocus(true);
-    if (cachedStats) updateDashboardUI();
+    if (cachedStats) {
+        updateDashboardUI();
+        // Redessine le graphique après un frame (le canvas doit être visible)
+        requestAnimationFrame(() => {
+            drawMonthlyChart(cachedStats.monthlyChartData);
+            initChartHover(cachedStats.monthlyChartData);
+        });
+    }
 }
 
 export function closeDashboard() {

@@ -12,6 +12,8 @@ let isPlaying            = false;
 let playInterval         = null;
 let currentTimelineIndex = 0;
 let sortedDates          = [];
+let playSpeed            = 1;    // 0.5 | 1 | 2
+let viewMode             = 'day'; // 'day' | 'month'
 
 // --- INIT ---
 export function initTimeline() {
@@ -19,8 +21,16 @@ export function initTimeline() {
     document.getElementById('timeline-slider')?.addEventListener('input', onSliderInput);
     document.getElementById('timeline-play-btn')?.addEventListener('click', togglePlay);
     document.getElementById('timeline-close-btn')?.addEventListener('click', closeTimeline);
-    // Se ferme automatiquement quand un BeReal ou le Dashboard s'ouvre
+    document.getElementById('timeline-speed-btn')?.addEventListener('click', cycleSpeed);
+    document.getElementById('timeline-mode-btn')?.addEventListener('click', toggleMode);
     document.addEventListener('app:modal-open', closeTimeline);
+
+    // Raccourcis clavier
+    document.addEventListener('keydown', (e) => {
+        // Ignore si focus sur un input
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        if (e.key === 'T' || e.key === 't') toggleTimeline();
+    });
 }
 
 // --- OPEN / CLOSE ---
@@ -62,10 +72,17 @@ export function getIsTimelineOpen() { return isTimelineOpen; }
 function buildSortedDates() {
     const filters  = getActiveFilters();
     const filtered = applyFiltersToData(allMemoriesData, filters);
-    const dateSet  = new Set(
-        filtered.filter(m => m.takenTime).map(m => m.takenTime.split('T')[0])
-    );
-    sortedDates = [...dateSet].sort();
+    if (viewMode === 'month') {
+        const monthSet = new Set(
+            filtered.filter(m => m.takenTime).map(m => m.takenTime.slice(0, 7)) // YYYY-MM
+        );
+        sortedDates = [...monthSet].sort();
+    } else {
+        const dateSet = new Set(
+            filtered.filter(m => m.takenTime).map(m => m.takenTime.split('T')[0])
+        );
+        sortedDates = [...dateSet].sort();
+    }
 }
 
 // --- RENDU À UN INDEX ---
@@ -73,10 +90,15 @@ function renderAtIndex(index) {
     if (!sortedDates.length) return;
     currentTimelineIndex = index;
 
-    const cutoffDate = sortedDates[index];
-    const filters    = getActiveFilters();
-    const filtered   = applyFiltersToData(allMemoriesData, filters)
-        .filter(m => m.takenTime && m.takenTime.split('T')[0] <= cutoffDate);
+    const cutoff  = sortedDates[index];
+    const filters = getActiveFilters();
+    // En mode mois, le cutoff est YYYY-MM → on compare les 7 premiers caractères
+    const filtered = applyFiltersToData(allMemoriesData, filters)
+        .filter(m => {
+            if (!m.takenTime) return false;
+            const key = viewMode === 'month' ? m.takenTime.slice(0, 7) : m.takenTime.split('T')[0];
+            return key <= cutoff;
+        });
 
     // setData() fluide au lieu de reconstruire toute la source
     updateMapData(convertMemoriesToGeoJSON(filtered));
@@ -89,12 +111,23 @@ function updateTimelineLabel(index) {
     const label = document.getElementById('timeline-date-label');
     if (!label || !sortedDates.length) return;
 
-    const dateStr   = sortedDates[index];
-    const d         = new Date(dateStr + 'T12:00:00');
-    const formatted = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    const filters   = getActiveFilters();
-    const count     = applyFiltersToData(allMemoriesData, filters)
-        .filter(m => m.takenTime && m.takenTime.split('T')[0] <= dateStr).length;
+    const key     = sortedDates[index];
+    const filters = getActiveFilters();
+    let formatted;
+    if (viewMode === 'month') {
+        const d = new Date(key + '-01T12:00:00');
+        formatted = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    } else {
+        const d = new Date(key + 'T12:00:00');
+        formatted = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    const count = applyFiltersToData(allMemoriesData, filters)
+        .filter(m => {
+            if (!m.takenTime) return false;
+            const k = viewMode === 'month' ? m.takenTime.slice(0, 7) : m.takenTime.split('T')[0];
+            return k <= key;
+        }).length;
 
     label.innerHTML = `<span class="timeline-date">${formatted}</span><span class="timeline-count">${count} BeReal${count > 1 ? 's' : ''}</span>`;
 }
@@ -125,13 +158,14 @@ function startPlay() {
         renderAtIndex(0);
     }
 
+    const ms = Math.round(180 / playSpeed);
     playInterval = setInterval(() => {
         if (currentTimelineIndex >= sortedDates.length - 1) { stopPlay(); return; }
         currentTimelineIndex++;
         const slider = document.getElementById('timeline-slider');
         if (slider) slider.value = currentTimelineIndex;
         renderAtIndex(currentTimelineIndex);
-    }, 180);
+    }, ms);
 }
 
 function stopPlay() {
@@ -139,6 +173,30 @@ function stopPlay() {
     clearInterval(playInterval);
     playInterval = null;
     document.getElementById('timeline-play-btn')?.classList.remove('playing');
+}
+
+// --- VITESSE ---
+const SPEEDS     = [0.5, 1, 2];
+const SPEED_LABELS = { 0.5: '×0.5', 1: '×1', 2: '×2' };
+
+function cycleSpeed() {
+    const idx  = SPEEDS.indexOf(playSpeed);
+    playSpeed  = SPEEDS[(idx + 1) % SPEEDS.length];
+    const btn  = document.getElementById('timeline-speed-btn');
+    if (btn) btn.textContent = SPEED_LABELS[playSpeed];
+    // Si en cours de lecture, relance avec la nouvelle vitesse
+    if (isPlaying) { stopPlay(); startPlay(); }
+}
+
+// --- MODE JOUR / MOIS ---
+function toggleMode() {
+    viewMode   = viewMode === 'day' ? 'month' : 'day';
+    const btn  = document.getElementById('timeline-mode-btn');
+    if (btn) btn.textContent = viewMode === 'day' ? 'Jour' : 'Mois';
+    if (isTimelineOpen) {
+        stopPlay();
+        openTimeline(); // Reconstruit avec le nouveau mode
+    }
 }
 
 // --- APPLIQUER FILTRES SANS CONTRAINTE DE DATE ---

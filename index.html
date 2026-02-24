@@ -160,8 +160,18 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+
+                        <!-- PAGE 3 — Graphique mensuel -->
+                        <div id="dash-page-3" class="dash-page">
+                            <div class="chart-page-inner">
+                                <div class="chart-title">BeReals par mois</div>
+                                <div class="chart-canvas-wrapper">
+                                    <canvas id="monthly-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div><!-- /#dash-slider -->
+                </div><!-- /#dash-cards-wrapper -->
 
                 <div class="logout-wrapper">
                     <div id="export-json-btn" class="logout-card-minimal" style="display: none; margin-right: 10px; background: rgba(255, 255, 255, 0.05);">
@@ -239,6 +249,8 @@
                     <span class="timeline-count">-- BeReals</span>
                 </div>
                 <div class="timeline-controls">
+                    <button id="timeline-mode-btn" class="timeline-ctrl-pill">Jour</button>
+                    <button id="timeline-speed-btn" class="timeline-ctrl-pill">×1</button>
                     <button id="timeline-play-btn" title="Play / Pause">
                         <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                         <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>

@@ -320,12 +320,10 @@
 
 #dash-slider {
     display: flex;
-    width: 200%;
+    width: 300%;
     will-change: transform;
-    /* On stabilise le rendu */
     transform: translate3d(0, 0, 0);
     transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-    will-change: transform;
 }
 
 #dash-slider:active .stat-card {
@@ -333,13 +331,12 @@
 }
 
 .dash-page {
-    width: 50%;
+    width: 33.333%;
     flex-shrink: 0;
-    padding: 0 30px; 
+    padding: 0 30px;
     box-sizing: border-box;
     display: block !important;
     overflow: visible !important;
-    /* On utilise l'opacité simple au lieu des animations complexes */
     transition: opacity 0.4s ease;
     backface-visibility: hidden;
     perspective: 1000px;
@@ -351,8 +348,8 @@
 }
 
 
-#dash-page-1, #dash-page-2 {
-    width: 50%;
+#dash-page-1, #dash-page-2, #dash-page-3 {
+    width: 33.333%;
     flex-shrink: 0;
 }
 
@@ -486,3 +483,36 @@
 }
 
 /* #endregion 5 */
+/* ============================================================
+   GRAPHIQUE MENSUEL — Page 3 Dashboard
+   ============================================================ */
+
+.chart-page-inner {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    gap: 10px;
+}
+
+.chart-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+    padding-top: 4px;
+}
+
+.chart-canvas-wrapper {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+}
+
+#monthly-chart {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}

@@ -437,3 +437,25 @@
 }
 
 .filter-divider { height: 1px; background: rgba(255,255,255,0.06); margin: 2px 0; }
+
+/* ── Boutons contrôle timeline (vitesse / mode) ──────────────── */
+.timeline-ctrl-pill {
+    height: 28px;
+    padding: 0 10px;
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.65);
+    border-radius: 20px;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.timeline-ctrl-pill:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    transform: scale(1.05);
+}
