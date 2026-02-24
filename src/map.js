@@ -17,7 +17,8 @@ export const map = new maplibregl.Map({
     maxZoom: 17,
     maxPitch: 85,
     pitch: 0,
-    antialias: true
+    antialias: true,
+    attributionControl: false
 });
 
 // --- BÂTIMENTS 3D ---
@@ -116,18 +117,24 @@ export function setMapFocus(isFocus) {
     const badge = document.querySelector('.user-profile-header');
     const controls = document.querySelector('.map-controls');
 
+    const bottomControls = document.querySelector('.bottom-controls');
+
     if (isFocus) {
         mapEl.style.transform = 'scale(1.05)';
         mapEl.style.filter = 'blur(5px) brightness(0.4)';
         badge.style.filter = 'blur(3px)';
         badge.style.pointerEvents = 'none';
         controls?.classList.add('frozen');
+        bottomControls?.classList.add('frozen');
+        // Ferme le modal filtres et la timeline quand une modale s'ouvre
+        document.dispatchEvent(new CustomEvent('app:modal-open'));
     } else {
         mapEl.style.transform = 'scale(1)';
         mapEl.style.filter = 'none';
         badge.style.filter = 'none';
         badge.style.pointerEvents = 'auto';
         controls?.classList.remove('frozen');
+        bottomControls?.classList.remove('frozen');
         updateMapControls();
     }
 }
@@ -153,7 +160,7 @@ export function setupMapLayers(features) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features },
         cluster: true,
-        clusterMaxZoom: 17,
+        clusterMaxZoom: 22,
         clusterRadius: currentRadiusMode
     });
 
@@ -234,7 +241,7 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: convertMemoriesToGeoJSON(data) },
         cluster: true,
-        clusterMaxZoom: 17,
+        clusterMaxZoom: 22,
         clusterRadius: currentRadiusMode
     });
 
@@ -247,7 +254,7 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
 export function watchZoomRadius(onRadiusChange) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
-        const newRadius = zoom >= 14 ? 100 : 50;
+        const newRadius = zoom >= 14 ? 100 : 60;
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
             onRadiusChange();
@@ -301,14 +308,20 @@ northBtn?.addEventListener('click', () => { map.easeTo({ bearing: 0, duration: 8
 pitchBtn?.addEventListener('click', () => map.easeTo({ pitch: 0, duration: 800 }));
 document.getElementById('terrain-button')?.addEventListener('click', toggleTerrain);
 
-// --- PROXIMITÉ SOURIS BOUTON TERRAIN ---
-const TERRAIN_PROXIMITY_PX = 80;
+// --- PROXIMITÉ SOURIS — Bouton terrain + boutons bas-droit ---
+const PROXIMITY_PX = 100;
 
 document.addEventListener('mousemove', (e) => {
-    if (!terrainBtn) return;
-    const rect = terrainBtn.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-    terrainBtn.classList.toggle('nearby', dist < TERRAIN_PROXIMITY_PX);
+    // Terrain
+    if (terrainBtn) {
+        const r = terrainBtn.getBoundingClientRect();
+        const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+        terrainBtn.classList.toggle('nearby', dist < PROXIMITY_PX);
+    }
+    // Boutons bas-droit (timeline + filtres)
+    document.querySelectorAll('.bottom-ctrl-btn').forEach(btn => {
+        const r = btn.getBoundingClientRect();
+        const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+        btn.classList.toggle('nearby', dist < PROXIMITY_PX);
+    });
 });

@@ -1,5 +1,8 @@
 /**
  * FILTERS.JS — Modal filtres draggable + repliable
+ * Corrections : badge uniquement si filtre actif, positioning amélioré,
+ * toggle onTime, labels BeLate/BeReal, snap dans l'écran au dépliage,
+ * fermeture auto sur app:modal-open.
  */
 
 import { allMemoriesData }                                        from './state.js';
@@ -8,19 +11,23 @@ import { applyFiltersToMap, openTimeline, getIsTimelineOpen }     from './timeli
 
 const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-let isFiltersOpen    = false;
-let isCollapsed      = false;
-let isDragging       = false;
-let dragOffsetX      = 0;
-let dragOffsetY      = 0;
-let hasBeenDragged   = false; // Mémorise si l'utilisateur a déplacé le modal
+let isFiltersOpen  = false;
+let isCollapsed    = false;
+let isDragging     = false;
+let dragOffsetX    = 0;
+let dragOffsetY    = 0;
+let hasBeenDragged = false;
 
 // --- INIT ---
 export function initFilters() {
-    document.getElementById('filters-toggle-btn')?.addEventListener('click', toggleFilters);
-    document.getElementById('filters-close-btn')?.addEventListener('click', closeFilters);
-    document.getElementById('filters-reset-btn')?.addEventListener('click', resetFilters);
+    document.getElementById('filters-toggle-btn')?.addEventListener('click',   toggleFilters);
+    document.getElementById('filters-close-btn')?.addEventListener('click',    closeFilters);
+    document.getElementById('filters-reset-btn')?.addEventListener('click',    resetFilters);
     document.getElementById('filters-collapse-btn')?.addEventListener('click', toggleCollapse);
+
+    // Ferme automatiquement si un modal BeReal ou Dashboard s'ouvre
+    document.addEventListener('app:modal-open', closeFilters);
+
     initDrag();
 }
 
@@ -36,7 +43,6 @@ function initDrag() {
         dragOffsetX = clientX - rect.left;
         dragOffsetY = clientY - rect.top;
         modal.style.transition = 'opacity 0.25s ease, transform 0.3s cubic-bezier(0.16,1,0.3,1)';
-        // Passe en coordonnées top/left absolues
         modal.style.bottom = 'auto';
         modal.style.right  = 'auto';
         modal.style.left   = rect.left + 'px';
@@ -60,7 +66,7 @@ function initDrag() {
         e.preventDefault();
     });
     document.addEventListener('mousemove', (e) => moveDrag(e.clientX, e.clientY));
-    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('mouseup',   endDrag);
 
     handle.addEventListener('touchstart', (e) => {
         if (e.target.closest('button')) return;
@@ -92,8 +98,8 @@ function toggleFilters() {
 }
 
 function openFiltersModal() {
-    isFiltersOpen  = true;
-    isCollapsed    = false;
+    isFiltersOpen = true;
+    isCollapsed   = false;
     buildFiltersUI();
     updateResultCount();
 
@@ -101,36 +107,45 @@ function openFiltersModal() {
     const toggler = document.getElementById('filters-toggle-btn');
     if (!modal || !toggler) return;
 
-    // Si non déplacé par l'utilisateur → positionne au-dessus du bouton
+    modal.classList.remove('filters-modal--collapsed');
+
+    // Position : au-dessus du bouton, sauf si l'user l'a déjà déplacé
     if (!hasBeenDragged) {
-        const btnRect     = toggler.getBoundingClientRect();
-        const modalWidth  = 300;
-        const modalHeight = 340; // Estimation (vrai offsetHeight pas dispo avant affichage)
-        const gap         = 12;
+        // Calcule après un frame pour avoir les bonnes dimensions
+        modal.style.visibility = 'hidden';
+        modal.classList.add('filters-modal--visible');
 
-        // Aligne à droite sur le bouton, s'assure de ne pas sortir de l'écran
-        let left = btnRect.right - modalWidth;
-        let top  = btnRect.top - modalHeight - gap;
+        requestAnimationFrame(() => {
+            const btnRect     = toggler.getBoundingClientRect();
+            const modalW      = modal.offsetWidth  || 300;
+            const modalH      = modal.offsetHeight || 360;
+            const gap         = 14;
 
-        left = Math.max(8, Math.min(left, window.innerWidth  - modalWidth  - 8));
-        top  = Math.max(8, top);
+            let left = btnRect.right - modalW;
+            let top  = btnRect.top - modalH - gap;
 
-        modal.style.bottom = 'auto';
-        modal.style.right  = 'auto';
-        modal.style.left   = left + 'px';
-        modal.style.top    = top  + 'px';
-        modal.style.transformOrigin = 'bottom right';
+            left = Math.max(8, Math.min(left, window.innerWidth  - modalW - 8));
+            top  = Math.max(8, Math.min(top,  window.innerHeight - modalH - 8));
+
+            modal.style.bottom = 'auto';
+            modal.style.right  = 'auto';
+            modal.style.left   = left + 'px';
+            modal.style.top    = top  + 'px';
+            modal.style.transformOrigin = 'bottom right';
+            modal.style.visibility = '';
+        });
+    } else {
+        modal.classList.add('filters-modal--visible');
     }
 
-    modal.classList.remove('filters-modal--collapsed');
-    modal.classList.add('filters-modal--visible');
     toggler.classList.add('filter-btn--active');
 }
 
 export function closeFilters() {
+    if (!isFiltersOpen) return;
     isFiltersOpen = false;
     document.getElementById('filters-modal')?.classList.remove('filters-modal--visible');
-    updateFilterBadge(); // Garde le badge si filtres actifs
+    updateFilterBadge(); // badge reste si filtres actifs, disparaît sinon
 }
 
 // --- COLLAPSE / EXPAND ---
@@ -138,28 +153,57 @@ function toggleCollapse() {
     isCollapsed = !isCollapsed;
     const modal = document.getElementById('filters-modal');
     modal?.classList.toggle('filters-modal--collapsed', isCollapsed);
-    if (!isCollapsed) updateResultCount();
-    // Met à jour le titre replié
+
+    if (!isCollapsed) {
+        // Attend la fin de la transition CSS avant de mesurer les vraies dimensions
+        modal.addEventListener('transitionend', function onEnd(e) {
+            if (e.propertyName !== 'opacity' && e.propertyName !== 'transform') return;
+            modal.removeEventListener('transitionend', onEnd);
+            snapIntoViewport(modal);
+        });
+        updateResultCount();
+    }
     updateCollapsedTitle();
+}
+
+// Remet le modal entièrement dans l'écran après dépliage
+function snapIntoViewport(modal) {
+    if (!modal) return;
+    const rect = modal.getBoundingClientRect();
+    let left = parseFloat(modal.style.left) || rect.left;
+    let top  = parseFloat(modal.style.top)  || rect.top;
+
+    const overRight  = rect.right  - window.innerWidth  + 8;
+    const overBottom = rect.bottom - window.innerHeight + 8;
+
+    if (overRight  > 0) left -= overRight;
+    if (overBottom > 0) top  -= overBottom;
+    left = Math.max(8, left);
+    top  = Math.max(8, top);
+
+    modal.style.left = left + 'px';
+    modal.style.top  = top  + 'px';
+    modal.style.bottom = 'auto';
+    modal.style.right  = 'auto';
+    hasBeenDragged = true; // on garde la position calculée
 }
 
 function updateCollapsedTitle() {
     const titleEl = document.querySelector('#filters-modal .filters-title');
     if (!titleEl) return;
-    if (isCollapsed && hasActiveFilters()) {
-        titleEl.textContent = buildFilterSummary();
-    } else {
-        titleEl.textContent = 'Filtres';
-    }
+    titleEl.textContent = (isCollapsed && hasActiveFilters())
+        ? buildFilterSummary()
+        : 'Filtres';
 }
 
 function buildFilterSummary() {
-    const f     = getActiveFilters();
+    const f = getActiveFilters();
     const parts = [];
-    if (f.years.length)  parts.push(f.years.join(', '));
-    if (f.months.length) parts.push(f.months.map(i => MONTH_LABELS[i]).join(', '));
-    if (f.onTime === 'ontime') parts.push('À l\'heure');
-    if (f.onTime === 'late')   parts.push('En retard');
+    if (f.years.length)        parts.push(f.years.join(', '));
+    if (f.months.length)       parts.push(f.months.map(i => MONTH_LABELS[i]).join(', '));
+    if (f.onTime === 'ontime') parts.push('BeReal');
+    if (f.onTime === 'late')   parts.push('BeLate');
+    if (f.onTime === 'bonus')  parts.push('BeBonus');
     return parts.length ? parts.join(' · ') : 'Filtres';
 }
 
@@ -170,7 +214,7 @@ function renderYearButtons(years) {
     container.innerHTML = '';
     const f = getActiveFilters();
     years.forEach(year => {
-        const btn = makeChip(year, f.years.includes(year), () => {
+        const btn = makeChip(year, f.years.includes(year), 'year', () => {
             toggleArrayFilter('years', year);
             btn.classList.toggle('filter-chip--active');
             applyAndRefresh();
@@ -185,7 +229,7 @@ function renderMonthButtons() {
     container.innerHTML = '';
     const f = getActiveFilters();
     MONTH_LABELS.forEach((label, i) => {
-        const btn = makeChip(label, f.months.includes(i), () => {
+        const btn = makeChip(label, f.months.includes(i), 'month', () => {
             toggleArrayFilter('months', i);
             btn.classList.toggle('filter-chip--active');
             applyAndRefresh();
@@ -197,27 +241,38 @@ function renderMonthButtons() {
 function renderOnTimeButtons() {
     const options = [
         { value: 'all',    label: 'Tous' },
-        { value: 'ontime', label: '⏱ À l\'heure' },
-        { value: 'late',   label: '🐌 En retard' }
+        { value: 'ontime', label: '⏱️ BeReal' },
+        { value: 'late',   label: '🐌 BeLate'  },
+        { value: 'bonus',  label: '🎁 BeBonus' }
     ];
     const container = document.getElementById('filter-ontime-container');
     if (!container) return;
     container.innerHTML = '';
     const f = getActiveFilters();
     options.forEach(opt => {
-        const btn = makeChip(opt.label, f.onTime === opt.value, () => {
-            f.onTime = opt.value;
-            container.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('filter-chip--active'));
-            btn.classList.add('filter-chip--active');
+        const btn = makeChip(opt.label, f.onTime === opt.value, 'ontime', () => {
+            // Toggle : si déjà actif, revient à "all"
+            f.onTime = (f.onTime === opt.value && opt.value !== 'all') ? 'all' : opt.value;
+            // Re-render les boutons pour refléter l'état
+            renderOnTimeButtons();
             applyAndRefresh();
         }, 'filter-chip--pill');
         container.appendChild(btn);
     });
 }
 
-function makeChip(label, active, onClick, extraClass = '') {
+/**
+ * Crée un chip bouton.
+ * @param {string} sizeGroup - 'year' | 'month' | 'ontime' — pour aligner les tailles
+ */
+function makeChip(label, active, sizeGroup, onClick, extraClass = '') {
     const btn = document.createElement('button');
-    btn.className = `filter-chip${extraClass ? ' ' + extraClass : ''}${active ? ' filter-chip--active' : ''}`;
+    btn.className = [
+        'filter-chip',
+        `filter-chip--${sizeGroup}`,
+        extraClass,
+        active ? 'filter-chip--active' : ''
+    ].filter(Boolean).join(' ');
     btn.textContent = label;
     btn.addEventListener('click', onClick);
     return btn;
@@ -239,11 +294,16 @@ function resetFilters() {
     applyAndRefresh();
 }
 
-// --- BADGE & COMPTEUR ---
+// --- BADGE (uniquement si filtre réellement actif) ---
 function updateFilterBadge() {
     const btn = document.getElementById('filters-toggle-btn');
     if (!btn) return;
-    btn.classList.toggle('filter-btn--active', hasActiveFilters() || isFiltersOpen);
+    // Bouton "actif" (outline blanc) = ouvert OU filtres appliqués
+    const open    = isFiltersOpen;
+    const active  = hasActiveFilters();
+    btn.classList.toggle('filter-btn--active', open || active);
+    // Pastille visible SEULEMENT si au moins un vrai filtre est sélectionné
+    btn.classList.toggle('filter-has-active', active);
 }
 
 function updateResultCount() {

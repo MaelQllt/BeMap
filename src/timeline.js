@@ -19,6 +19,8 @@ export function initTimeline() {
     document.getElementById('timeline-slider')?.addEventListener('input', onSliderInput);
     document.getElementById('timeline-play-btn')?.addEventListener('click', togglePlay);
     document.getElementById('timeline-close-btn')?.addEventListener('click', closeTimeline);
+    // Se ferme automatiquement quand un BeReal ou le Dashboard s'ouvre
+    document.addEventListener('app:modal-open', closeTimeline);
 }
 
 // --- OPEN / CLOSE ---
@@ -34,9 +36,9 @@ export function openTimeline() {
     if (slider) {
         slider.min   = 0;
         slider.max   = sortedDates.length - 1;
-        slider.value = sortedDates.length - 1;
+        slider.value = 0;
     }
-    currentTimelineIndex = sortedDates.length - 1;
+    currentTimelineIndex = 0;
     renderAtIndex(currentTimelineIndex);
     updateTimelineLabel(currentTimelineIndex);
 }

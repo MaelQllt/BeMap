@@ -219,6 +219,15 @@
             </svg>
             Timeline
         </button>
+
+        <!-- Bouton attribution — le plus bas, panel vers la gauche -->
+        <div class="attrib-wrapper">
+            <div id="attrib-panel" class="attrib-panel">
+                © <a href="https://www.maptiler.com/copyright/" target="_blank">MapTiler</a>
+                &nbsp;© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a>
+            </div>
+            <button id="attrib-btn" class="bottom-ctrl-btn attrib-btn" aria-label="Attribution">ℹ</button>
+        </div>
     </div>
 
     <!-- ── Panneau Timeline ──────────────────────────────────────── -->
@@ -277,5 +286,27 @@
     </div>
 
     <script type="module" src="src/app.js"></script>
+
+    <script>
+        // Attribution toggle — bouton ℹ custom
+        const attribBtn   = document.getElementById('attrib-btn');
+        const attribPanel = document.getElementById('attrib-panel');
+        let attribOpen = false;
+
+        attribBtn?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            attribOpen = !attribOpen;
+            attribPanel.classList.toggle('attrib-panel--visible', attribOpen);
+            attribBtn.classList.toggle('filter-btn--active', attribOpen);
+        });
+
+        // Ferme en cliquant ailleurs
+        document.addEventListener('click', () => {
+            if (!attribOpen) return;
+            attribOpen = false;
+            attribPanel.classList.remove('attrib-panel--visible');
+            attribBtn.classList.remove('filter-btn--active');
+        });
+    </script>
 </body>
 </html>
