@@ -28,6 +28,17 @@ export function initFilters() {
     // Ferme automatiquement si un modal BeReal ou Dashboard s'ouvre
     document.addEventListener('app:modal-open', closeFilters);
 
+    // Clic en dehors = replie (pas ferme)
+    document.addEventListener('click', (e) => {
+        if (!isFiltersOpen) return;
+        const modal   = document.getElementById('filters-modal');
+        const toggler = document.getElementById('filters-toggle-btn');
+        if (!modal || !toggler) return;
+        if (!modal.contains(e.target) && !toggler.contains(e.target)) {
+            closeFilters();
+        }
+    });
+
     initDrag();
 }
 

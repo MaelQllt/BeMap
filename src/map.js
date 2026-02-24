@@ -160,7 +160,7 @@ export function setupMapLayers(features) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features },
         cluster: true,
-        clusterMaxZoom: 22,
+        clusterMaxZoom: 17,
         clusterRadius: currentRadiusMode
     });
 
@@ -241,7 +241,7 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: convertMemoriesToGeoJSON(data) },
         cluster: true,
-        clusterMaxZoom: 22,
+        clusterMaxZoom: 17,
         clusterRadius: currentRadiusMode
     });
 
@@ -254,7 +254,7 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
 export function watchZoomRadius(onRadiusChange) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
-        const newRadius = zoom >= 14 ? 100 : 60;
+        const newRadius = zoom >= 14 ? 100 : 50;
         if (newRadius !== currentRadiusMode) {
             currentRadiusMode = newRadius;
             onRadiusChange();

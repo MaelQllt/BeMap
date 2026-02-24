@@ -201,6 +201,22 @@ export function updateDashboardUI() {
 export function openDashboard() {
     document.getElementById('dashboard-modal').style.display = 'flex';
     document.querySelector('.dashboard-positioner').style.display = 'flex';
+    // Remet toujours le slider sur la page 1 à l'ouverture
+    const slider = document.getElementById('dash-slider');
+    if (slider) {
+        slider.style.transition = 'none';
+        slider.style.transform  = 'translateX(0%)';
+        // Si des pages ont été réorganisées par les boucles de switchDash, remet l'ordre
+        const wrapper = slider;
+        const pages   = Array.from(wrapper.children);
+        const page1   = pages.find(p => p.id === 'dash-page-1' || p.querySelector('#stat-countries'));
+        const page2   = pages.find(p => p.id === 'dash-page-2' || p.querySelector('#stat-friends'));
+        if (page1 && page2 && wrapper.firstElementChild !== page1) {
+            wrapper.innerHTML = '';
+            wrapper.appendChild(page1);
+            wrapper.appendChild(page2);
+        }
+    }
     setMapFocus(true);
     if (cachedStats) updateDashboardUI();
 }
