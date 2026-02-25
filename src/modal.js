@@ -20,7 +20,7 @@ import {
     setMemoryToUpdate
 } from './state.js';
 import { setMapFocus } from './map.js';
-import { syncPWAHeight } from './utils.js';
+import { syncPWAHeight, revokeModalUrls } from './utils.js';
 
 const miniBox       = document.getElementById('mini-img-box');
 const mainPhoto     = document.getElementById('main-photo');
@@ -51,6 +51,7 @@ export function closeModal() {
     }
     setMapFocus(false);
     syncPWAHeight();
+    revokeModalUrls(); // libère les blobs des photos affichées
 }
 
 // --- CONTENU ---
@@ -242,10 +243,15 @@ photoContainer.addEventListener('mousedown', (e) => {
 
 // --- BOUTON REPLACER ---
 document.getElementById('replace-button')?.addEventListener('click', () => {
-    setMemoryToUpdate(currentPhotos[currentIndex]);
+    const photo = currentPhotos[currentIndex];
+    setMemoryToUpdate(photo);
     setIsRelocating(true);
     closeModal();
     document.getElementById('map').style.cursor = 'crosshair';
+    // Dispatch pour que app.js puisse allumer le highlight sur le bon marker
+    document.dispatchEvent(new CustomEvent('app:relocation-start', {
+        detail: { uid: photo.uid, rawDate: photo.rawDate }
+    }));
 });
 
 // --- NAVIGATION ---

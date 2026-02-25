@@ -5,7 +5,7 @@
 
 import { saveFileToSession, loadSessionFiles, checkDifferencesAndShowExport } from './db.js';
 import { fileMap, setFileMap, allMemoriesData, setAllMemoriesData, isRelocating, memoryToUpdate, setIsRelocating } from './state.js';
-import { map, setup3DBuildings, setupMapLayers, refreshMapMarkers, watchZoomRadius } from './map.js';
+import { map, setup3DBuildings, setupMapLayers, refreshMapMarkers, watchZoomRadius, showRelocationHighlight, clearRelocationHighlight } from './map.js';
 import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDash } from './dashboard.js';
 import { initBadge } from './badge.js';
 import { getLocalUrl, syncPWAHeight, setMapRef } from './utils.js';
@@ -14,6 +14,7 @@ import { initTimeline, applyFiltersToMap } from './timeline.js';
 import { initFilters, buildFiltersUI, closeFilters } from './filters.js';
 
 setMapRef(map);
+let _saveDebounceTimer = null; // debounce pour saveFileToSession après relocation
 
 // --- TOAST INLINE CARTE ---
 function showMapToast(message, type = 'success') {
@@ -130,6 +131,13 @@ async function initApp(userData, memoriesData, friendsData) {
 }
 
 // --- REPOSITIONNEMENT D'UN BEREAL ---
+// Allume le highlight sur le marker dès que le mode relocation démarre
+document.addEventListener('app:relocation-start', (e) => {
+    const { uid, rawDate } = e.detail;
+    // Léger délai pour laisser closeModal() finir (setMapFocus remet les layers)
+    requestAnimationFrame(() => showRelocationHighlight(uid, rawDate));
+});
+
 map.on('click', async (e) => {
     if (!isRelocating || !memoryToUpdate) return;
 
@@ -147,8 +155,14 @@ map.on('click', async (e) => {
 
     allMemoriesData[index].location  = { latitude: lat, longitude: lng };
     allMemoriesData[index]._relocated = true; // flag session : permet de re-déplacer dans la même session
-    const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
-    await saveFileToSession("memories.json", blob);
+
+    // Debounce : on diffère la sérialisation de 1 s pour absorber les repositionnements rapides successifs.
+    // La carte et l'UI sont mis à jour immédiatement — seule l'écriture IndexedDB est retardée.
+    clearTimeout(_saveDebounceTimer);
+    _saveDebounceTimer = setTimeout(async () => {
+        const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
+        await saveFileToSession("memories.json", blob);
+    }, 1000);
 
     refreshMapMarkers(allMemoriesData, convertMemoriesToGeoJSON);
     checkDifferencesAndShowExport();
@@ -167,6 +181,7 @@ map.on('click', async (e) => {
     }
 
     setIsRelocating(false);
+    clearRelocationHighlight();
     document.getElementById('map').style.cursor = '';
     showMapToast("Position mise à jour.");
 });
@@ -270,6 +285,7 @@ document.addEventListener('keydown', (e) => {
     // Annulation du mode relocation via Échap
     if (e.key === 'Escape' && isRelocating) {
         setIsRelocating(false);
+        clearRelocationHighlight();
         document.getElementById('map').style.cursor = '';
         showMapToast("Repositionnement annulé.");
         return;

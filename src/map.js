@@ -270,6 +270,45 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     map.triggerRepaint();
 }
 
+// --- HIGHLIGHT RELOCATION ---
+// Affiche un ring animé sur le marker correspondant au BeReal en cours de relocation.
+// uid/rawDate correspondent aux propriétés du feature GeoJSON.
+let _relocHighlightEl = null;
+
+export function showRelocationHighlight(uid, rawDate) {
+    clearRelocationHighlight();
+    // Cherche le marker dont les features correspondent
+    for (const [id, marker] of Object.entries(clusterMarkers)) {
+        if (id.startsWith('c-')) continue; // on ignore les clusters
+        const el = marker.getElement();
+        // On identifie le marker via son id qui encode les coords — on doit
+        // retrouver via querySourceFeatures pour avoir les props
+        const features = map.querySourceFeatures('bereal-src', {
+            filter: ['!', ['has', 'point_count']]
+        });
+        const match = features.find(f =>
+            (uid   != null && f.properties.uid     === uid) ||
+            (rawDate       && f.properties.rawDate === rawDate)
+        );
+        if (!match) continue;
+        // Vérifie que ce marker est bien celui du feature trouvé
+        const coords   = marker.getLngLat();
+        const fCoords  = match.geometry.coordinates;
+        if (Math.abs(coords.lng - fCoords[0]) > 0.00001) continue;
+
+        el.classList.add('marker--relocating');
+        _relocHighlightEl = el;
+        break;
+    }
+}
+
+export function clearRelocationHighlight() {
+    if (_relocHighlightEl) {
+        _relocHighlightEl.classList.remove('marker--relocating');
+        _relocHighlightEl = null;
+    }
+}
+
 // Ajuste le rayon de clustering selon le niveau de zoom.
 // onRadiusChange() est appelé sans argument — le caller fournit les données filtrées courantes.
 export function watchZoomRadius(onRadiusChange) {

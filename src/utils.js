@@ -10,13 +10,21 @@ let _mapRef = null;
 export function setMapRef(m) { _mapRef = m; }
 
 /**
- * Retourne une Object URL locale pour un chemin de fichier de l'archive
+ * Retourne une Object URL locale pour un chemin de fichier de l'archive.
+ * Les URLs sont mises en cache dans objectUrlCache pour éviter les doublons.
+ * Les URLs créées pour le modal courant sont trackées dans _modalUrlKeys
+ * afin d'être révoquées à la fermeture du modal (libération mémoire).
  */
+const _modalUrlKeys = new Set(); // clés des URLs créées pour le modal ouvert
+
 export function getLocalUrl(jsonPath) {
     if (!jsonPath) return "";
     let cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
 
-    if (objectUrlCache.has(cleanPath)) return objectUrlCache.get(cleanPath);
+    if (objectUrlCache.has(cleanPath)) {
+        _modalUrlKeys.add(cleanPath); // déjà en cache, on note quand même pour tracking
+        return objectUrlCache.get(cleanPath);
+    }
 
     let file = fileMap[cleanPath] || null;
 
@@ -31,11 +39,29 @@ export function getLocalUrl(jsonPath) {
     if (file) {
         const newUrl = URL.createObjectURL(file);
         objectUrlCache.set(cleanPath, newUrl);
+        _modalUrlKeys.add(cleanPath);
         return newUrl;
     }
 
     console.warn("Fichier non trouvé :", cleanPath);
     return "";
+}
+
+/**
+ * Révoque les Object URLs créées pendant la session modale et les retire du cache.
+ * À appeler à chaque fermeture de modal pour libérer la mémoire blob.
+ * Les URLs de la photo de profil (profile/) sont préservées car réutilisées en permanence.
+ */
+export function revokeModalUrls() {
+    for (const key of _modalUrlKeys) {
+        if (key.startsWith('Photos/profile/') || key.startsWith('Photos/bereal/')) continue;
+        const url = objectUrlCache.get(key);
+        if (url) {
+            URL.revokeObjectURL(url);
+            objectUrlCache.delete(key);
+        }
+    }
+    _modalUrlKeys.clear();
 }
 
 /**

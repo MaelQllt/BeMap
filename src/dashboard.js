@@ -76,12 +76,13 @@ export async function calculateStats(data, userData, friendsData) {
             maxStreak = Math.max(maxStreak, currentStreak);
         }
 
-        // --- 2. PONCTUALITÉ (% à l'heure par moment unique) ---
+        // --- 2. PONCTUALITÉ (% global + breakdown par année) ---
         const momentIds = [...new Set(data.map(m => m.berealMoment || m.takenTime?.split('T')[0]))];
         const onTimeCount = momentIds.filter(id =>
             data.some(m => (m.berealMoment === id || m.takenTime?.split('T')[0] === id) && m.isLate === false)
         ).length;
         const percent = momentIds.length > 0 ? Math.round((onTimeCount / momentIds.length) * 100) : 0;
+
 
         // --- 3. GÉOGRAPHIE (Optimisation du chargement GeoJSON) ---
         const validMemories = data.filter(m => m.location?.latitude && m.location?.longitude);
@@ -362,7 +363,7 @@ function initChartHover(data) {
 
 
 // Adapte la taille de police pour qu'elle rentre dans la stat-card
-function fitStatText(el, maxSize = 32, minSize = 8) {
+function fitStatText(el, maxSize = 38, minSize = 8) {
     if (!el) return;
     const card = el.closest('.stat-card');
     if (!card) return;
@@ -387,6 +388,8 @@ function fitStatText(el, maxSize = 32, minSize = 8) {
     el.style.display = 'block';
 }
 
+
+
 export function updateDashboardUI() {
     if (!cachedStats) return;
     const mapping = {
@@ -400,7 +403,7 @@ export function updateDashboardUI() {
         'stat-join-date':       cachedStats.joinDate,
         'stat-best-month-name': cachedStats.bestMonthName,
         'stat-best-month-label':cachedStats.bestMonthLabel,
-        'stat-avg-time':        cachedStats.avgTime.toUpperCase()
+        'stat-avg-time':        cachedStats.avgTime.toUpperCase(),
     };
     for (const [id, value] of Object.entries(mapping)) {
         const el = document.getElementById(id);
@@ -408,7 +411,8 @@ export function updateDashboardUI() {
     }
 
     // Ajuste la taille de police du mois record pour qu'il rentre dans la card
-    requestAnimationFrame(() => fitStatText(document.getElementById('stat-best-month-name'), 28));
+    requestAnimationFrame(() => fitStatText(document.getElementById('stat-best-month-name'), 38));
+
     
     if (cachedStats?.monthlyChartData) {
         requestAnimationFrame(() => {

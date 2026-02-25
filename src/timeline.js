@@ -34,6 +34,8 @@ export function initTimeline() {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.key === 'T' || e.key === 't') toggleTimeline();
         if (e.key === 'Escape' && isTimelineOpen) closeTimeline();
+        // Espace = play/pause si la timeline est ouverte (preventDefault évite le scroll)
+        if (e.key === ' ' && isTimelineOpen) { e.preventDefault(); togglePlay(); }
     });
 }
 
