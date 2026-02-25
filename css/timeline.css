@@ -457,6 +457,12 @@
     transform: scale(1.05);
 }
 
+.timeline-ctrl-pill--active {
+    background: rgba(255, 255, 255, 0.22);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
 /* Croix fermeture — pseudo-éléments CSS pur, zéro SVG, marche partout */
 #filters-close-btn,
 #timeline-close-btn {

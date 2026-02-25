@@ -83,7 +83,7 @@ export function updateModalContent() {
 
     // Bouton replacer : visible seulement si la localisation est absente ou nulle
     const hasValidLocation = loc?.latitude && loc?.longitude && loc.latitude !== 0;
-    if (replaceBtn) replaceBtn.style.display = hasValidLocation ? 'none' : 'block';
+    if (replaceBtn) replaceBtn.style.display = p.canBeRelocated ? 'block' : 'none';
 
     // Position de la miniature (respecte le côté choisi par l'utilisateur)
     miniBox.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';

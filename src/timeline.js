@@ -27,9 +27,9 @@ export function initTimeline() {
 
     // Raccourcis clavier
     document.addEventListener('keydown', (e) => {
-        // Ignore si focus sur un input
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (e.key === 'T' || e.key === 't') toggleTimeline();
+        if (e.key === 'Escape' && isTimelineOpen) closeTimeline();
     });
 }
 
@@ -92,7 +92,6 @@ function renderAtIndex(index) {
 
     const cutoff  = sortedDates[index];
     const filters = getActiveFilters();
-    // En mode mois, le cutoff est YYYY-MM → on compare les 7 premiers caractères
     const filtered = applyFiltersToData(allMemoriesData, filters)
         .filter(m => {
             if (!m.takenTime) return false;
@@ -100,19 +99,18 @@ function renderAtIndex(index) {
             return key <= cutoff;
         });
 
-    // setData() fluide au lieu de reconstruire toute la source
     updateMapData(convertMemoriesToGeoJSON(filtered));
-    updateTimelineLabel(index);
+    // Passe le count directement pour éviter un double applyFiltersToData
+    updateTimelineLabel(index, filtered.length);
     updateSliderProgress(index);
 }
 
 // --- LABEL DATE ---
-function updateTimelineLabel(index) {
+function updateTimelineLabel(index, count) {
     const label = document.getElementById('timeline-date-label');
     if (!label || !sortedDates.length) return;
 
-    const key     = sortedDates[index];
-    const filters = getActiveFilters();
+    const key = sortedDates[index];
     let formatted;
     if (viewMode === 'month') {
         const d = new Date(key + '-01T12:00:00');
@@ -122,12 +120,16 @@ function updateTimelineLabel(index) {
         const d = new Date(key + 'T12:00:00');
         formatted = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     }
-    const count = applyFiltersToData(allMemoriesData, filters)
-        .filter(m => {
-            if (!m.takenTime) return false;
-            const k = viewMode === 'month' ? m.takenTime.slice(0, 7) : m.takenTime.split('T')[0];
-            return k <= key;
-        }).length;
+    // Si count non fourni (appel direct depuis openTimeline), le calcule
+    if (count === undefined) {
+        const filters = getActiveFilters();
+        count = applyFiltersToData(allMemoriesData, filters)
+            .filter(m => {
+                if (!m.takenTime) return false;
+                const k = viewMode === 'month' ? m.takenTime.slice(0, 7) : m.takenTime.split('T')[0];
+                return k <= key;
+            }).length;
+    }
 
     label.innerHTML = `<span class="timeline-date">${formatted}</span><span class="timeline-count">${count} BeReal${count > 1 ? 's' : ''}</span>`;
 }
@@ -192,10 +194,13 @@ function cycleSpeed() {
 function toggleMode() {
     viewMode   = viewMode === 'day' ? 'month' : 'day';
     const btn  = document.getElementById('timeline-mode-btn');
-    if (btn) btn.textContent = viewMode === 'day' ? 'Jour' : 'Mois';
+    if (btn) {
+        btn.textContent = viewMode === 'day' ? 'Jour' : 'Mois';
+        btn.classList.toggle('timeline-ctrl-pill--active', viewMode === 'month');
+    }
     if (isTimelineOpen) {
         stopPlay();
-        openTimeline(); // Reconstruit avec le nouveau mode
+        openTimeline();
     }
 }
 

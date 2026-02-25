@@ -144,9 +144,8 @@ export async function calculateStats(data, userData, friendsData) {
         for (const [month, count] of Object.entries(monthCounts)) {
             if (count > maxPhotos) {
                 maxPhotos = count;
-                const parts = month.split(' ');
-                const shortYear = parts[1] ? "'" + parts[1].slice(2) : '';
-                bestMonthName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + (shortYear ? ' ' + shortYear : '');
+
+                bestMonthName = month.charAt(0).toUpperCase() + month.slice(1);
             }
         }
 
@@ -327,13 +326,18 @@ function fitStatText(el, maxSize = 32, minSize = 8) {
     const card = el.closest('.stat-card');
     if (!card) return;
 
-    // Force la largeur de l'élément à celle de la card (padding 15px de chaque côté)
     const availW = card.getBoundingClientRect().width - 30;
+
+    // Si la card n'est pas encore visible (dashboard fermé), réessaie plus tard
+    if (availW <= 0) {
+        requestAnimationFrame(() => fitStatText(el, maxSize, minSize));
+        return;
+    }
+
     el.style.whiteSpace = 'nowrap';
     el.style.display    = 'inline-block';
     el.style.maxWidth   = availW + 'px';
 
-    // Descend jusqu'à ce que le texte rentre
     for (let size = maxSize; size >= minSize; size -= 1) {
         el.style.fontSize = size + 'px';
         if (el.scrollWidth <= availW) break;
@@ -363,8 +367,8 @@ export function updateDashboardUI() {
     }
 
     // Ajuste la taille de police du mois record pour qu'il rentre dans la card
-    requestAnimationFrame(() => fitStatText(document.getElementById('stat-best-month-name')));
-
+    requestAnimationFrame(() => fitStatText(document.getElementById('stat-best-month-name'), 28));
+    
     if (cachedStats?.monthlyChartData) {
         requestAnimationFrame(() => {
             drawMonthlyChart(cachedStats.monthlyChartData);

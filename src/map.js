@@ -195,12 +195,23 @@ export function setupMapLayers(features) {
                                 map.easeTo({ center: coords, zoom: Math.min(expansionZoom, MAX_ZOOM) });
                             } else {
                                 map.getSource('bereal-src').getClusterLeaves(props.cluster_id, Infinity, 0, (err2, leaves) => {
-                                    if (!err2) openModal(leaves.map(l => l.properties).sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate)));
+                                    if (!err2) {
+                                        // On extrait les propriétés de chaque point du cluster
+                                        const photos = leaves.map(l => l.properties).sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
+                                        
+                                        // openModal va appeler updateModalContent() qui utilisera 
+                                        // maintenant le flag canBeRelocated de la première photo (index 0)
+                                        openModal(photos); 
+                                    }
                                 });
                             }
                         });
                     } else {
                         openModal([props]);
+                        const replaceBtn = document.getElementById('replace-button');
+                        if (replaceBtn) {
+                            replaceBtn.style.display = props.canBeRelocated ? 'block' : 'none';
+                        }
                     }
                 });
 

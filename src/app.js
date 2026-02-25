@@ -71,6 +71,10 @@ export function convertMemoriesToGeoJSON(data) {
         const lng = parseFloat(m.location?.longitude);
         const lat = parseFloat(m.location?.latitude);
 
+        const canBeRelocated = m.canBeRelocated || (isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0);
+
+        m.canBeRelocated = m.canBeRelocated || (isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0);
+        
         return {
             type: 'Feature',
             geometry: { type: 'Point', coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] },
@@ -82,6 +86,7 @@ export function convertMemoriesToGeoJSON(data) {
                 rawDate:  m.takenTime,
                 // ID unique stable pour la relocation (takenTime + index dans le tableau original)
                 uid:      m.uid ?? m.takenTime,
+                canBeRelocated: canBeRelocated,
                 date:     m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
                 time:     m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
                 isLate:   m.isLate,
@@ -245,6 +250,8 @@ async function handleAutoLogin() {
 }
 
 // --- RACCOURCIS CLAVIER ---
+// F → filters.js, T/Escape timeline → timeline.js
+// Ici : navigation photo, flèches dashboard, relocation Échap
 document.addEventListener('keydown', (e) => {
     if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 
@@ -262,11 +269,6 @@ document.addEventListener('keydown', (e) => {
         document.getElementById('map').style.cursor = '';
         showMapToast("Repositionnement annulé.");
         return;
-    }
-
-    // Fermeture des panels via Échap
-    if (e.key === 'Escape') {
-        closeFilters();
     }
 
     const dash = document.getElementById('dashboard-modal');

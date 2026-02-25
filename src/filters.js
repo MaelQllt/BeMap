@@ -34,14 +34,14 @@ export function initFilters() {
         if (e.key === 'F' || e.key === 'f') toggleFilters();
     });
 
-    // Clic en dehors = replie (pas ferme)
+    // Clic en dehors = replie (si ouvert et pas déjà replié)
     document.addEventListener('click', (e) => {
-        if (!isFiltersOpen) return;
+        if (!isFiltersOpen || isCollapsed) return;
         const modal   = document.getElementById('filters-modal');
         const toggler = document.getElementById('filters-toggle-btn');
         if (!modal || !toggler) return;
         if (!modal.contains(e.target) && !toggler.contains(e.target)) {
-            closeFilters();
+            toggleCollapse();
         }
     });
 
@@ -125,6 +125,7 @@ function openFiltersModal() {
     if (!modal || !toggler) return;
 
     modal.classList.remove('filters-modal--collapsed');
+    updateCollapsedTitle(); // S'assure que le titre est "Filtres" à la réouverture
 
     // Position : au-dessus du bouton, sauf si l'user l'a déjà déplacé
     if (!hasBeenDragged) {
@@ -267,7 +268,8 @@ function renderOnTimeButtons() {
     container.innerHTML = '';
     const f = getActiveFilters();
     options.forEach(opt => {
-        const btn = makeChip(opt.label, f.onTime === opt.value, 'ontime', () => {
+        const btn = makeChip(opt.label, f.onTime === opt.value, 'ontime', (e) => {
+            e.stopPropagation();
             // Toggle : si déjà actif, revient à "all"
             f.onTime = (f.onTime === opt.value && opt.value !== 'all') ? 'all' : opt.value;
             // Re-render les boutons pour refléter l'état
