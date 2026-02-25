@@ -239,12 +239,9 @@
     width: 34px; height: 34px; border-radius: 50%;
     background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
     color: rgba(255,255,255,0.5); display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 18px; line-height: 1; transition: all 0.2s ease;
+    cursor: pointer; transition: color 0.4s ease, background 0.4s ease;
 }
-#timeline-close-btn:hover {
-    color: #fff; background: rgba(255,255,255,0.15);
-    transform: rotate(90deg) scale(1.08);
-}
+
 
 .timeline-slider-row { display: flex; align-items: center; }
 
@@ -368,9 +365,9 @@
     background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1);
     color: rgba(255,255,255,0.5);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; font-size: 15px; line-height: 1; transition: all 0.2s ease;
+    cursor: pointer; transition: color 0.4s ease, background 0.4s ease;
 }
-#filters-close-btn:hover { color: #fff; background: rgba(255,255,255,0.14); transform: rotate(90deg); }
+
 
 /* ── Corps ───────────────────────────────────────────────────── */
 .filters-body {
@@ -459,3 +456,45 @@
     color: #fff;
     transform: scale(1.05);
 }
+
+/* Croix fermeture — pseudo-éléments CSS pur, zéro SVG, marche partout */
+#filters-close-btn,
+#timeline-close-btn {
+    position: relative;
+    overflow: hidden; /* pas nécessaire mais propre */
+}
+
+/* Les deux branches de la croix */
+#filters-close-btn::before,
+#filters-close-btn::after,
+#timeline-close-btn::before,
+#timeline-close-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 1.8px;
+    background: #fff;
+    border-radius: 2px;
+    transform-origin: center center;
+    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+    opacity: 0.45;
+}
+
+#filters-close-btn::before { transform: translate(-50%, -50%) rotate(45deg); }
+#filters-close-btn::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+#timeline-close-btn::before { transform: translate(-50%, -50%) rotate(45deg); }
+#timeline-close-btn::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+/* Hover : tourne de 90deg supplémentaires */
+#filters-close-btn:hover::before  { transform: translate(-50%, -50%) rotate(135deg); }
+#filters-close-btn:hover::after   { transform: translate(-50%, -50%) rotate(45deg); }
+#timeline-close-btn:hover::before { transform: translate(-50%, -50%) rotate(135deg); }
+#timeline-close-btn:hover::after  { transform: translate(-50%, -50%) rotate(45deg); }
+
+#filters-close-btn:hover  { background: rgba(255,255,255,0.14); }
+#filters-close-btn:hover::before, #filters-close-btn:hover::after { opacity: 0.9; }
+#timeline-close-btn:hover { background: rgba(255,255,255,0.15); }
+#timeline-close-btn:hover::before, #timeline-close-btn:hover::after { opacity: 0.9; }

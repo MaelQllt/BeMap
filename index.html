@@ -120,7 +120,11 @@
                 <!-- HEADER FIXE : ne bouge jamais -->
                 <div class="dashboard-header">
                     <span class="dashboard-title">My BeReal.</span>
-                    <button class="close-dash">×</button>
+                    <button class="close-dash">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round">
+                            <line x1="2.5" y1="2.5" x2="9.5" y2="9.5"/><line x1="9.5" y1="2.5" x2="2.5" y2="9.5"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <!-- ZONE ANIMÉE : seules les cards roulent -->
@@ -160,6 +164,7 @@
                                 </div>
                             </div>
                         </div>
+
 
                         <!-- PAGE 3 — Graphique mensuel -->
                         <div id="dash-page-3" class="dash-page">
@@ -255,7 +260,7 @@
                         <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                         <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                     </button>
-                    <button id="timeline-close-btn" title="Fermer">×</button>
+                    <button id="timeline-close-btn" title="Fermer"></button>
                 </div>
             </div>
             <div class="timeline-slider-row">
@@ -276,7 +281,7 @@
                         <polyline points="1 7 5 3 9 7"/>
                     </svg>
                 </button>
-                <button id="filters-close-btn">×</button>
+                <button id="filters-close-btn"></button>
             </div>
         </div>
         <div class="filters-body">

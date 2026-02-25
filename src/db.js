@@ -43,16 +43,22 @@ export async function loadSessionFiles() {
             const cursor = e.target.result;
             if (cursor) {
                 const data = cursor.value;
-                const key = cursor.key;
-                if (data && data.buffer) {
-                    results[key] = new File([data.buffer], data.name || key, { type: data.type || '' });
+                const key  = cursor.key;
+                try {
+                    if (data && data.buffer && data.buffer.byteLength > 0) {
+                        // Copie défensive du buffer pour éviter les buffers detached
+                        const safeBuf = data.buffer.slice(0);
+                        results[key] = new File([safeBuf], data.name || key, { type: data.type || '' });
+                    }
+                } catch (copyErr) {
+                    console.warn('Impossible de lire le fichier en cache:', key, copyErr);
                 }
                 cursor.continue();
             } else {
                 resolve(results);
             }
         };
-        request.onerror = () => reject("Erreur Cursor");
+        request.onerror = (e) => reject('Erreur Cursor: ' + (e.target.error?.message || e.target.error));
     });
 }
 

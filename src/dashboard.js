@@ -22,11 +22,9 @@ export function switchDash(direction = 'right') {
 
     slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
 
-    // Avec 3 pages en 300% de large, chaque page occupe 33.333%
-    const STEP = 33.333;
-
     if (direction === 'right') {
-        slider.style.transform = `translateX(-${STEP}%)`;
+        // Avec 3 pages en 300% de large, chaque page occupe 33.333%
+        slider.style.transform = 'translateX(-33.333%)';
         setTimeout(() => {
             slider.style.transition = 'none';
             slider.appendChild(slider.firstElementChild);
@@ -35,7 +33,7 @@ export function switchDash(direction = 'right') {
     } else {
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
-        slider.style.transform = `translateX(-${STEP}%)`;
+        slider.style.transform = 'translateX(-33.333%)';
         slider.offsetHeight;
         slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         slider.style.transform = 'translateX(0%)';
@@ -146,18 +144,18 @@ export async function calculateStats(data, userData, friendsData) {
         for (const [month, count] of Object.entries(monthCounts)) {
             if (count > maxPhotos) {
                 maxPhotos = count;
-                bestMonthName = month.charAt(0).toUpperCase() + month.slice(1);
+                const parts = month.split(' ');
+                const shortYear = parts[1] ? "'" + parts[1].slice(2) : '';
+                bestMonthName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + (shortYear ? ' ' + shortYear : '');
             }
         }
 
-        // Prépare les données mensuelles pour le graphique (triées chronologiquement)
+        const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
         const monthlyChartData = Object.entries(monthCounts)
             .map(([label, count]) => {
-                // Reconstruit une date depuis le label "janvier 2023"
-                const parts = label.split(' ');
-                const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-                const monthIdx  = MONTHS_FR.indexOf(parts[0].toLowerCase());
-                const year      = parseInt(parts[1]);
+                const parts    = label.split(' ');
+                const monthIdx = MONTHS_FR.indexOf(parts[0].toLowerCase());
+                const year     = parseInt(parts[1]);
                 return { label, count, sortKey: year * 12 + monthIdx };
             })
             .sort((a, b) => a.sortKey - b.sortKey);
@@ -192,20 +190,17 @@ export async function calculateStats(data, userData, friendsData) {
 }
 
 // Injecte les valeurs calculées dans le DOM du dashboard
-// --- GRAPHIQUE MENSUEL (canvas pur + tooltip hover) ---
 
-// Cache des positions de barres pour le hit-test au hover
+// --- GRAPHIQUE MENSUEL ---
 let _chartBarRects = [];
-let _chartCanvas   = null;
 
 function drawMonthlyChart(data, hoveredIndex = -1) {
     const canvas = document.getElementById('monthly-chart');
     if (!canvas || !data || !data.length) return;
-    _chartCanvas = canvas;
-    const ctx    = canvas.getContext('2d');
-    const dpr    = window.devicePixelRatio || 1;
-    const W      = canvas.offsetWidth;
-    const H      = canvas.offsetHeight;
+    const ctx  = canvas.getContext('2d');
+    const dpr  = window.devicePixelRatio || 1;
+    const W    = canvas.offsetWidth;
+    const H    = canvas.offsetHeight;
     canvas.width  = W * dpr;
     canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
@@ -220,70 +215,52 @@ function drawMonthlyChart(data, hoveredIndex = -1) {
 
     ctx.clearRect(0, 0, W, H);
 
-    // Lignes de grille horizontales
-    const gridLines = 4;
+    // Grille
     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
     ctx.lineWidth   = 1;
-    for (let i = 0; i <= gridLines; i++) {
-        const y = padT + chartH - (i / gridLines) * chartH;
+    for (let i = 0; i <= 4; i++) {
+        const y = padT + chartH - (i / 4) * chartH;
         ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
     }
 
     // Barres
     _chartBarRects = [];
     data.forEach((d, i) => {
-        const x      = padL + gap + i * (barW + gap);
-        const barH   = (d.count / maxVal) * chartH;
-        const y      = padT + chartH - barH;
-        const isHov  = i === hoveredIndex;
+        const x     = padL + gap + i * (barW + gap);
+        const barH  = (d.count / maxVal) * chartH;
+        const y     = padT + chartH - barH;
+        const isHov = i === hoveredIndex;
+        _chartBarRects.push({ x, y: padT, w: barW, h: chartH, index: i });
 
-        _chartBarRects.push({ x, y: padT, w: barW, h: chartH, dataY: y, dataH: barH, index: i });
-
-        // Zone de surbrillance verticale au hover
         if (isHov) {
             ctx.fillStyle = 'rgba(255,255,255,0.06)';
             ctx.fillRect(x - 2, padT, barW + 4, chartH);
         }
 
         const grad = ctx.createLinearGradient(0, y, 0, padT + chartH);
-        if (isHov) {
-            grad.addColorStop(0, 'rgba(255,255,255,1)');
-            grad.addColorStop(1, 'rgba(255,255,255,0.3)');
-        } else {
-            grad.addColorStop(0, 'rgba(255,255,255,0.85)');
-            grad.addColorStop(1, 'rgba(255,255,255,0.15)');
-        }
+        grad.addColorStop(0, isHov ? 'rgba(255,255,255,1)'    : 'rgba(255,255,255,0.85)');
+        grad.addColorStop(1, isHov ? 'rgba(255,255,255,0.3)'  : 'rgba(255,255,255,0.15)');
         ctx.fillStyle = grad;
 
         const r = Math.min(3, barW / 2);
         ctx.beginPath();
-        ctx.moveTo(x + r, y);
-        ctx.lineTo(x + barW - r, y);
+        ctx.moveTo(x + r, y); ctx.lineTo(x + barW - r, y);
         ctx.quadraticCurveTo(x + barW, y, x + barW, y + r);
-        ctx.lineTo(x + barW, padT + chartH);
-        ctx.lineTo(x, padT + chartH);
-        ctx.lineTo(x, y + r);
-        ctx.quadraticCurveTo(x, y, x + r, y);
-        ctx.closePath();
-        ctx.fill();
+        ctx.lineTo(x + barW, padT + chartH); ctx.lineTo(x, padT + chartH);
+        ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath(); ctx.fill();
 
-        // Valeur au-dessus de la barre hover
         if (isHov) {
-            const label  = d.count.toString();
-            const textX  = x + barW / 2;
-            const textY  = y - 5;
-            ctx.font      = 'bold 11px Inter, sans-serif';
+            ctx.font = 'bold 11px Inter, sans-serif';
             ctx.textAlign = 'center';
-            // Halo pour lisibilité
             ctx.fillStyle = 'rgba(0,0,0,0.5)';
-            ctx.fillText(label, textX + 0.5, textY + 0.5);
+            ctx.fillText(d.count, x + barW / 2 + 0.5, y - 4.5);
             ctx.fillStyle = '#fff';
-            ctx.fillText(label, textX, textY);
+            ctx.fillText(d.count, x + barW / 2, y - 5);
         }
     });
 
-    // Labels axe X : affiche l'année quand elle change
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    // Labels année
     ctx.font      = `${Math.max(8, Math.min(10, Math.floor(chartW / n * 0.9)))}px Inter, sans-serif`;
     ctx.textAlign = 'center';
     let lastYear  = null;
@@ -291,20 +268,19 @@ function drawMonthlyChart(data, hoveredIndex = -1) {
         const x    = padL + gap + i * (barW + gap) + barW / 2;
         const year = d.label.split(' ')[1];
         if (year !== lastYear) {
-            const isHov = i === hoveredIndex;
-            ctx.fillStyle = isHov ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)';
+            ctx.fillStyle = i === hoveredIndex ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.3)';
             ctx.fillText(year, x, H - 6);
             lastYear = year;
         }
     });
 
-    // Valeur max en haut
+    // Max value
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font      = '9px Inter, sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(maxVal, padL - 2, padT + 4);
 
-    // Tooltip mois — centré en haut du graphique, au-dessus des barres
+    // Tooltip centré en haut (dessiné en dernier = au premier plan)
     if (hoveredIndex >= 0 && hoveredIndex < data.length) {
         const d       = data[hoveredIndex];
         const label   = d.label.charAt(0).toUpperCase() + d.label.slice(1);
@@ -312,46 +288,58 @@ function drawMonthlyChart(data, hoveredIndex = -1) {
         ctx.font      = 'bold 11px Inter, sans-serif';
         ctx.textAlign = 'center';
         const tx = W / 2;
-        const ty = 15;
-        // Fond pill
         const tw = ctx.measureText(tooltip).width;
         ctx.fillStyle = 'rgba(255,255,255,0.1)';
-        const pillX = tx - tw / 2 - 8;
-        const pillH = 18;
         ctx.beginPath();
-        ctx.roundRect(pillX, ty - 13, tw + 16, pillH, 6);
+        ctx.roundRect(tx - tw / 2 - 8, 4, tw + 16, 18, 6);
         ctx.fill();
-        // Texte
         ctx.fillStyle = 'rgba(255,255,255,0.9)';
-        ctx.fillText(tooltip, tx, ty);
+        ctx.fillText(tooltip, tx, 16);
     }
 }
 
-// Initialise le listener mousemove/mouseleave sur le canvas pour le hover
 function initChartHover(data) {
     const canvas = document.getElementById('monthly-chart');
     if (!canvas || canvas._hoverInited) return;
     canvas._hoverInited = true;
-
     canvas.addEventListener('mousemove', (e) => {
-        const rect   = canvas.getBoundingClientRect();
-        const mx     = e.clientX - rect.left;
-        const my     = e.clientY - rect.top;
-        let found    = -1;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+        let found = -1;
         for (const bar of _chartBarRects) {
             if (mx >= bar.x && mx <= bar.x + bar.w && my >= bar.y && my <= bar.y + bar.h) {
-                found = bar.index;
-                break;
+                found = bar.index; break;
             }
         }
         canvas.style.cursor = found >= 0 ? 'crosshair' : 'default';
         drawMonthlyChart(data, found);
     });
-
     canvas.addEventListener('mouseleave', () => {
         canvas.style.cursor = 'default';
         drawMonthlyChart(data, -1);
     });
+}
+
+
+// Adapte la taille de police pour qu'elle rentre dans la stat-card
+function fitStatText(el, maxSize = 32, minSize = 8) {
+    if (!el) return;
+    const card = el.closest('.stat-card');
+    if (!card) return;
+
+    // Force la largeur de l'élément à celle de la card (padding 15px de chaque côté)
+    const availW = card.getBoundingClientRect().width - 30;
+    el.style.whiteSpace = 'nowrap';
+    el.style.display    = 'inline-block';
+    el.style.maxWidth   = availW + 'px';
+
+    // Descend jusqu'à ce que le texte rentre
+    for (let size = maxSize; size >= minSize; size -= 1) {
+        el.style.fontSize = size + 'px';
+        if (el.scrollWidth <= availW) break;
+    }
+
+    el.style.display = 'block';
 }
 
 export function updateDashboardUI() {
@@ -374,7 +362,9 @@ export function updateDashboardUI() {
         if (el) el.innerText = value;
     }
 
-    // Graphique mensuel
+    // Ajuste la taille de police du mois record pour qu'il rentre dans la card
+    requestAnimationFrame(() => fitStatText(document.getElementById('stat-best-month-name')));
+
     if (cachedStats?.monthlyChartData) {
         requestAnimationFrame(() => {
             drawMonthlyChart(cachedStats.monthlyChartData);
@@ -386,26 +376,23 @@ export function updateDashboardUI() {
 export function openDashboard() {
     document.getElementById('dashboard-modal').style.display = 'flex';
     document.querySelector('.dashboard-positioner').style.display = 'flex';
-    // Remet toujours le slider sur la page 1 à l'ouverture
+    // Remet les 3 pages dans l'ordre + reset position
     const slider = document.getElementById('dash-slider');
     if (slider) {
-        slider.style.transition = 'none';
-        slider.style.transform  = 'translateX(0%)';
-        // Si des pages ont été réorganisées par les boucles de switchDash, remet l'ordre
-        // Remet les 3 pages dans l'ordre original (le carrousel réordonne le DOM)
         const p1 = slider.querySelector('#dash-page-1');
         const p2 = slider.querySelector('#dash-page-2');
         const p3 = slider.querySelector('#dash-page-3');
         if (p1 && p2 && p3) {
+            slider.style.transition = 'none';
             slider.appendChild(p1);
             slider.appendChild(p2);
             slider.appendChild(p3);
+            slider.style.transform = 'translateX(0%)';
         }
     }
     setMapFocus(true);
     if (cachedStats) {
         updateDashboardUI();
-        // Redessine le graphique après un frame (le canvas doit être visible)
         requestAnimationFrame(() => {
             drawMonthlyChart(cachedStats.monthlyChartData);
             initChartHover(cachedStats.monthlyChartData);
