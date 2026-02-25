@@ -136,6 +136,8 @@ export function setMapFocus(isFocus) {
         controls?.classList.remove('frozen');
         bottomControls?.classList.remove('frozen');
         updateMapControls();
+        // Permet à la timeline de reprendre après fermeture d'un modal BeReal
+        document.dispatchEvent(new CustomEvent('app:modal-close'));
     }
 }
 
@@ -166,7 +168,15 @@ export function setupMapLayers(features) {
 
     reAddLayers();
 
+    // Throttle via rAF : évite de recalculer les markers à chaque frame de rendu
+    let _renderPending = false;
     map.on('render', () => {
+        if (_renderPending) return;
+        _renderPending = true;
+        requestAnimationFrame(() => { _renderPending = false; _updateMarkers(); });
+    });
+
+    function _updateMarkers() {
         const newMarkers = {};
         for (const feature of map.querySourceFeatures('bereal-src')) {
             const coords = feature.geometry.coordinates;
@@ -222,7 +232,7 @@ export function setupMapLayers(features) {
         for (const id in clusterMarkers) {
             if (!newMarkers[id]) { clusterMarkers[id].remove(); delete clusterMarkers[id]; }
         }
-    });
+    }
 
     map.on('mouseenter', 'clusters', () => map.getCanvas().style.cursor = 'pointer');
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');

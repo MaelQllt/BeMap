@@ -37,8 +37,10 @@ export function initBadge() {
     document.addEventListener('mousemove', (e) => {
         if (!isDraggingBadge) return;
         if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) hasMovedBadge = true;
-        targetX = e.clientX - mouseX;
-        targetY = e.clientY - mouseY;
+        // On recalcule le delta depuis startX/startY pour éviter un saut au premier frame
+        // si mouseX n'est pas encore synchro avec la position courante de la souris.
+        targetX = e.clientX - startX;
+        targetY = e.clientY - startY;
     });
 
     const stopBadgeDrag = () => { isDraggingBadge = false; targetX = 0; targetY = 0; };

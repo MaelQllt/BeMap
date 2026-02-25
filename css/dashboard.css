@@ -134,69 +134,48 @@
 /* --- HARMONISATION DES CARTES --- */
 .stat-card {
     background: #ffffff14;
-    padding: 24px 15px; 
+    padding: 24px 15px;
     border-radius: 24px;
-    display: flex; 
-    flex-direction: column; 
+    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center; /* Centre verticalement le contenu */
+    justify-content: center;
     border: 1px solid transparent;
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
-                background-color 0.3s ease, 
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+                background-color 0.3s ease,
                 border-color 0.3s ease;
     cursor: default;
-    
-    /* Force une hauteur minimale identique pour toutes les petites cartes */
-    min-height: 120px; 
+    min-height: 120px;
     box-sizing: border-box;
-
     position: relative;
     z-index: 1;
-
     backface-visibility: hidden;
     -webkit-font-smoothing: antialiased;
     transform-style: preserve-3d;
 }
 
+/* Règle unique fusionnée (supprime les deux blocs précédents redondants) */
 .stat-card:hover {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(255, 255, 255, 0.15);
-    transform: translateY(-5px) scale(1.04); /* Combine tes deux transforms ici */
-    
-    position: relative; 
-    z-index: 999 !important; 
+    transform: translateY(-5px) scale(1.04);
+    position: relative;
+    z-index: 999 !important;
 }
 
-/* --- AJUSTEMENT DES VALEURS --- */
-.stat-value { 
-    font-size: 32px; /* Réduit de 38px à 32px pour laisser respirer */
-    font-weight: 900; 
+/* --- VALEURS --- */
+/* Règle unique fusionnée : 32px (lisible) + utilitaires overflow */
+.stat-value {
+    font-size: 32px;
+    font-weight: 900;
     transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
     display: inline-block;
     color: var(--text-secondary);
     text-align: center;
     width: 100%;
-    white-space: nowrap;      /* Empêche le retour à la ligne */
-    overflow: hidden;         /* Coupe si c'est vraiment trop long */
-    text-overflow: ellipsis;  /* Ajoute "..." si c'est coupé */
-}
-
-
-/* --- INTERACTION CARTE --- */
-.stat-card:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-    transform: translateY(-5px); /* Léger soulèvement de la carte */
-    z-index: 50;
-    position: relative;
-}
-
-.stat-value { 
-    font-size: 38px; 
-    font-weight: 900; 
-    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.5);
-    display: inline-block; /* Important pour que le scale fonctionne */
-    color: var(--text-secondary); 
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* --- EFFET GONFLEMENT DU CHIFFRE --- */

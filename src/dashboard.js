@@ -34,16 +34,20 @@ export function switchDash(direction = 'right') {
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
         slider.style.transform = 'translateX(-33.333%)';
-        slider.offsetHeight;
-        slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-        slider.style.transform = 'translateX(0%)';
+        // rAF au lieu de offsetHeight pour forcer le reflow sans bloquer le thread principal
+        requestAnimationFrame(() => {
+            slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
+            slider.style.transform = 'translateX(0%)';
+        });
     }
 
     setTimeout(() => { isAnimatingDash = false; }, DURATION);
 }
 
-// Calcule toutes les statistiques depuis les données brutes
-// Le cache est invalidé par setCachedStats(null) avant d'appeler cette fonction
+// Calcule toutes les statistiques depuis les données brutes.
+// ⚠️  CONTRAT : appelez setCachedStats(null) AVANT tout recalcul forcé (ex: après relocation).
+//     Sans cela, la sortie anticipée ci-dessous retourne les anciennes valeurs si data.length
+//     n'a pas changé (ajout/suppression de BeReal non détecté autrement).
 export async function calculateStats(data, userData, friendsData) {
     // 1. Sortie anticipée si les données n'ont pas changé
     if (cachedStats && cachedStats.total === data.length) {
@@ -96,22 +100,35 @@ export async function calculateStats(data, userData, friendsData) {
         const foundCountries = new Set();
         const foundDeps = new Set();
 
-        geoPoints.forEach(coords => {
-            const pt = turf.point(coords);
-            
-            // Analyse Monde
-            for (const c of worldGeoCache.features) {
-                if (turf.booleanPointInPolygon(pt, c)) {
-                    foundCountries.add(c.properties.ADMIN || c.properties.name);
+        // Pré-calcule les bounding boxes une seule fois pour éviter de les recalculer
+        // à chaque point — réduit le coût de booleanPointInPolygon de ~80%.
+        const worldFeaturesWithBbox = worldGeoCache.features.map(f => ({
+            feature: f,
+            bbox: turf.bbox(f),
+        }));
+        const depsFeaturesWithBbox = depsGeoCache.features.map(f => ({
+            feature: f,
+            bbox: turf.bbox(f),
+        }));
+
+        geoPoints.forEach(([lng, lat]) => {
+            const pt = turf.point([lng, lat]);
+
+            // Analyse Monde — bounding box guard avant le test polygonal coûteux
+            for (const { feature, bbox } of worldFeaturesWithBbox) {
+                if (lng < bbox[0] || lng > bbox[2] || lat < bbox[1] || lat > bbox[3]) continue;
+                if (turf.booleanPointInPolygon(pt, feature)) {
+                    foundCountries.add(feature.properties.ADMIN || feature.properties.name);
                     break;
                 }
             }
-            
-            // Analyse Départements (si dans la bounding box France métropolitaine)
-            if (coords[0] > -5 && coords[0] < 10 && coords[1] > 41 && coords[1] < 52) {
-                for (const d of depsGeoCache.features) {
-                    if (turf.booleanPointInPolygon(pt, d)) {
-                        foundDeps.add(d.properties.nom);
+
+            // Analyse Départements (bounding box France métropolitaine + bbox par feature)
+            if (lng > -5 && lng < 10 && lat > 41 && lat < 52) {
+                for (const { feature, bbox } of depsFeaturesWithBbox) {
+                    if (lng < bbox[0] || lng > bbox[2] || lat < bbox[1] || lat > bbox[3]) continue;
+                    if (turf.booleanPointInPolygon(pt, feature)) {
+                        foundDeps.add(feature.properties.nom);
                         break;
                     }
                 }
@@ -301,6 +318,29 @@ function initChartHover(data) {
     const canvas = document.getElementById('monthly-chart');
     if (!canvas || canvas._hoverInited) return;
     canvas._hoverInited = true;
+
+    let _lastFound = -1;
+
+    const resetHover = () => {
+        if (_lastFound === -1) return;
+        _lastFound = -1;
+        canvas.style.cursor = 'default';
+        drawMonthlyChart(data, -1);
+    };
+
+    // Tracker document-level : seul moyen fiable de détecter une sortie rapide
+    // quand mouseleave/mouseout sont mangés par le scroll ou d'autres listeners.
+    const onDocMouseMove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const inside = e.clientX >= rect.left && e.clientX <= rect.right
+                    && e.clientY >= rect.top  && e.clientY <= rect.bottom;
+        if (!inside) resetHover();
+    };
+    document.addEventListener('mousemove', onDocMouseMove);
+
+    // Nettoyage si le dashboard est refermé (évite les listeners zombies)
+    canvas._hoverCleanup = () => document.removeEventListener('mousemove', onDocMouseMove);
+
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         const mx = e.clientX - rect.left, my = e.clientY - rect.top;
@@ -310,13 +350,14 @@ function initChartHover(data) {
                 found = bar.index; break;
             }
         }
-        canvas.style.cursor = found >= 0 ? 'crosshair' : 'default';
-        drawMonthlyChart(data, found);
+        canvas.style.cursor = found >= 0 ? 'pointer' : 'default';
+        if (found !== _lastFound) {
+            _lastFound = found;
+            drawMonthlyChart(data, found);
+        }
     });
-    canvas.addEventListener('mouseleave', () => {
-        canvas.style.cursor = 'default';
-        drawMonthlyChart(data, -1);
-    });
+
+    canvas.addEventListener('mouseleave', resetHover);
 }
 
 
@@ -408,6 +449,8 @@ export function closeDashboard() {
     document.getElementById('dashboard-modal').style.display = 'none';
     document.querySelector('.dashboard-positioner').style.display = 'none';
     setMapFocus(false);
+    // Supprime le listener document-level du chart hover pour éviter les zombies
+    document.getElementById('monthly-chart')?._hoverCleanup?.();
 }
 
 // Attache tous les listeners du dashboard (appelé une seule fois au démarrage)
@@ -428,7 +471,11 @@ export function initDashboard() {
     document.getElementById('export-json-btn')?.addEventListener('click', (e) => {
         e.stopPropagation();
         if (!allMemoriesData?.length) return;
-        const blob = new Blob([JSON.stringify(allMemoriesData, null, 2)], { type: 'application/json' });
+        // Exclut canBeRelocated de l'export : c'est un flag de session calculé à la volée,
+        // pas une donnée BeReal. Le persister ferait réapparaître le bouton Replacer
+        // sur des BeReals déjà repositionnés lors d'un réimport.
+        const exportData = allMemoriesData.map(({ canBeRelocated: _, _relocated: __, ...m }) => m);
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const link = Object.assign(document.createElement('a'), { href: url, download: 'memories.json' });
         document.body.appendChild(link);

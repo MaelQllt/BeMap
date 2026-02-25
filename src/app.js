@@ -71,10 +71,13 @@ export function convertMemoriesToGeoJSON(data) {
         const lng = parseFloat(m.location?.longitude);
         const lat = parseFloat(m.location?.latitude);
 
-        const canBeRelocated = m.canBeRelocated || (isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0);
+        // Calcul local, sans muter m — pour ne pas polluer allMemoriesData
+        // ni persister canBeRelocated dans l'export JSON.
+        // Repositionnable si : coords absentes/nulles OU déjà déplacé dans cette session (_relocated).
+        // Après export/réimport, _relocated est absent → seuls les 0,0 sont repositionnables.
+        const canBeRelocated = m._relocated === true
+            || ((isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0));
 
-        m.canBeRelocated = m.canBeRelocated || (isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0);
-        
         return {
             type: 'Feature',
             geometry: { type: 'Point', coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] },
@@ -86,7 +89,7 @@ export function convertMemoriesToGeoJSON(data) {
                 rawDate:  m.takenTime,
                 // ID unique stable pour la relocation (takenTime + index dans le tableau original)
                 uid:      m.uid ?? m.takenTime,
-                canBeRelocated: canBeRelocated,
+                canBeRelocated,
                 date:     m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
                 time:     m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
                 isLate:   m.isLate,
@@ -142,7 +145,8 @@ map.on('click', async (e) => {
         return;
     }
 
-    allMemoriesData[index].location = { latitude: lat, longitude: lng };
+    allMemoriesData[index].location  = { latitude: lat, longitude: lng };
+    allMemoriesData[index]._relocated = true; // flag session : permet de re-déplacer dans la même session
     const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
     await saveFileToSession("memories.json", blob);
 

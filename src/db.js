@@ -74,27 +74,31 @@ export async function clearSession() {
 
 export async function checkDifferencesAndShowExport() {
     const db = await openDB();
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
 
-    const reqCurrent = store.get("memories.json");
-    const reqOriginal = store.get("memories_original.json");
+    // Deux requêtes indépendantes dans leur propre transaction pour éviter
+    // la race condition liée à l'imbrication de callbacks sur une transaction partagée.
+    const getRecord = (key) => new Promise((resolve, reject) => {
+        const tx  = db.transaction(STORE_NAME, "readonly");
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror   = () => reject(req.error);
+    });
 
-    reqCurrent.onsuccess = () => {
-        reqOriginal.onsuccess = () => {
-            const exportBtn = document.getElementById('export-json-btn');
-            if (!exportBtn) return;
-            if (!reqOriginal.result || !reqCurrent.result) {
-                exportBtn.style.display = 'none';
-                return;
-            }
-            const currentData = new Uint8Array(reqCurrent.result.buffer);
-            const originalData = new Uint8Array(reqOriginal.result.buffer);
-            if (currentData.length !== originalData.length || currentData.some((val, i) => val !== originalData[i])) {
-                exportBtn.style.setProperty('display', 'inline-flex', 'important');
-            } else {
-                exportBtn.style.display = 'none';
-            }
-        };
-    };
+    const [current, original] = await Promise.all([
+        getRecord("memories.json"),
+        getRecord("memories_original.json"),
+    ]);
+
+    const exportBtn = document.getElementById('export-json-btn');
+    if (!exportBtn) return;
+
+    if (!current || !original) {
+        exportBtn.style.display = 'none';
+        return;
+    }
+
+    const cur = new Uint8Array(current.buffer);
+    const ori = new Uint8Array(original.buffer);
+    const isDifferent = cur.length !== ori.length || cur.some((val, i) => val !== ori[i]);
+    exportBtn.style.setProperty('display', isDifferent ? 'inline-flex' : 'none', isDifferent ? 'important' : '');
 }

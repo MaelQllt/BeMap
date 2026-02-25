@@ -14,6 +14,7 @@ let currentTimelineIndex = 0;
 let sortedDates          = [];
 let playSpeed            = 1;    // 0.5 | 1 | 2
 let viewMode             = 'day'; // 'day' | 'month'
+let _wasPlayingBeforeSuspend = false; // état lecture avant suspension par modal
 
 // --- INIT ---
 export function initTimeline() {
@@ -23,7 +24,10 @@ export function initTimeline() {
     document.getElementById('timeline-close-btn')?.addEventListener('click', closeTimeline);
     document.getElementById('timeline-speed-btn')?.addEventListener('click', cycleSpeed);
     document.getElementById('timeline-mode-btn')?.addEventListener('click', toggleMode);
-    document.addEventListener('app:modal-open', closeTimeline);
+    // Suspension/reprise : on ne ferme plus la timeline quand un modal BeReal s'ouvre.
+    // On la masque visuellement et on mémorise si elle jouait, pour reprendre après fermeture.
+    document.addEventListener('app:modal-open',  suspendTimeline);
+    document.addEventListener('app:modal-close', resumeTimeline);
 
     // Raccourcis clavier
     document.addEventListener('keydown', (e) => {
@@ -56,9 +60,28 @@ export function openTimeline() {
 export function closeTimeline() {
     isTimelineOpen = false;
     stopPlay();
+    _wasPlayingBeforeSuspend = false;
     document.getElementById('timeline-panel')?.classList.remove('timeline-panel--visible');
     document.getElementById('timeline-toggle-btn')?.classList.remove('timeline-btn--active');
     applyFiltersToMap();
+}
+
+// Masque le panel et met en pause sans toucher à l'état ni à la carte.
+// Appelé quand un modal BeReal/cluster s'ouvre par-dessus la timeline.
+function suspendTimeline() {
+    if (!isTimelineOpen) return;
+    _wasPlayingBeforeSuspend = isPlaying;
+    if (isPlaying) stopPlay();
+    document.getElementById('timeline-panel')?.classList.remove('timeline-panel--visible');
+}
+
+// Rétablit le panel et reprend la lecture si elle était active avant la suspension.
+// Appelé à la fermeture du modal BeReal/cluster.
+function resumeTimeline() {
+    if (!isTimelineOpen) return;
+    document.getElementById('timeline-panel')?.classList.add('timeline-panel--visible');
+    if (_wasPlayingBeforeSuspend) startPlay();
+    _wasPlayingBeforeSuspend = false;
 }
 
 function toggleTimeline() {
