@@ -20,7 +20,7 @@ import {
     setMemoryToUpdate
 } from './state.js';
 import { setMapFocus } from './map.js';
-import { syncPWAHeight, revokeModalUrls } from './utils.js';
+import { syncPWAHeight } from './utils.js';
 
 const miniBox       = document.getElementById('mini-img-box');
 const mainPhoto     = document.getElementById('main-photo');
@@ -51,7 +51,6 @@ export function closeModal() {
     }
     setMapFocus(false);
     syncPWAHeight();
-    revokeModalUrls(); // libère les blobs des photos affichées
 }
 
 // --- CONTENU ---

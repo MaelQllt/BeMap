@@ -47,22 +47,6 @@ export function getLocalUrl(jsonPath) {
     return "";
 }
 
-/**
- * Révoque les Object URLs créées pendant la session modale et les retire du cache.
- * À appeler à chaque fermeture de modal pour libérer la mémoire blob.
- * Les URLs de la photo de profil (profile/) sont préservées car réutilisées en permanence.
- */
-export function revokeModalUrls() {
-    for (const key of _modalUrlKeys) {
-        if (key.startsWith('Photos/profile/') || key.startsWith('Photos/bereal/')) continue;
-        const url = objectUrlCache.get(key);
-        if (url) {
-            URL.revokeObjectURL(url);
-            objectUrlCache.delete(key);
-        }
-    }
-    _modalUrlKeys.clear();
-}
 
 /**
  * Synchronise la hauteur de la carte (fix iOS/PWA)
