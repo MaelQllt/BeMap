@@ -22,11 +22,11 @@ import {
 import { setMapFocus } from './map.js';
 import { syncPWAHeight } from './utils.js';
 
-const miniBox       = document.getElementById('mini-img-box');
-const mainPhoto     = document.getElementById('main-photo');
+const miniBox        = document.getElementById('mini-img-box');
+const mainPhoto      = document.getElementById('main-photo');
 const photoContainer = document.getElementById('photo-container');
-const modal         = document.getElementById('bereal-modal');
-const counter       = document.getElementById('photo-counter');
+const modal          = document.getElementById('bereal-modal');
+const counter        = document.getElementById('photo-counter');
 
 // --- OUVERTURE / FERMETURE ---
 
@@ -38,7 +38,6 @@ export function openModal(photos) {
     modal.style.display = 'flex';
     setMapFocus(true);
     const isMobile = window.matchMedia('(pointer: coarse)').matches;
-    console.log('[hint] openModal — isMobile:', isMobile, '| photos.length:', photos.length);
     if (isMobile && photos.length > 1) _showHint();
 }
 
@@ -51,7 +50,6 @@ export function closeModal() {
         counter.style.right = '20px';
         counter.classList.remove('switching', 'from-left');
     }
-    console.log('[hint] closeModal — suppression hint');
     document.getElementById('swipe-hint')?.remove();
     setMapFocus(false);
     syncPWAHeight();
@@ -63,7 +61,6 @@ export function updateModalContent() {
     const p = currentPhotos[currentIndex];
     const replaceBtn = document.getElementById('replace-button');
 
-    // On cache le bouton replacer par défaut (sera affiché si nécessaire plus bas)
     replaceBtn?.style.setProperty('display', 'none', 'important');
     if (!p) return;
 
@@ -76,29 +73,22 @@ export function updateModalContent() {
     setIsFlipped(false);
     resetZoomState();
 
-    // Mise à jour des images et métadonnées
     mainPhoto.src = p.back;
     document.getElementById('mini-photo').src = p.front;
     document.getElementById('modal-caption').innerText = p.caption || "";
     document.getElementById('modal-metadata').innerText = `${p.date} • ${p.time}`;
 
-    // Bandeau vert "à l'heure" (seulement si c'est un vrai BeReal, pas un Bonus)
     photoContainer.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
 
-    // Bouton replacer : visible seulement si la localisation est absente ou nulle
-    const hasValidLocation = loc?.latitude && loc?.longitude && loc.latitude !== 0;
     if (replaceBtn) replaceBtn.style.display = p.canBeRelocated ? 'block' : 'none';
 
-    // Position de la miniature (respecte le côté choisi par l'utilisateur)
     miniBox.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     const xPos = currentMiniSide === 'right' ? photoContainer.offsetWidth - miniBox.offsetWidth - 28 : 0;
     miniBox.style.transform = `translate(${xPos}px, 0px)`;
 
-    // Navigation flèches et compteur
     const hasMultiple = currentPhotos.length > 1;
     const isMobile = window.matchMedia('(pointer: coarse)').matches;
 
-    // Sur mobile : flèches cachées (swipe gère la nav), sur desktop : flèches visibles selon position
     if (isMobile) {
         document.getElementById('prevBtn').style.display = 'none';
         document.getElementById('nextBtn').style.display = 'none';
@@ -109,7 +99,6 @@ export function updateModalContent() {
 
     if (counter) counter.innerText = hasMultiple ? `${currentIndex + 1}/${currentPhotos.length}` : '';
 
-    // Hint de swipe (mobile uniquement, disparaît après le premier swipe)
     _updateSwipeHint(hasMultiple && isMobile);
 }
 
@@ -129,7 +118,6 @@ export function prevPhoto() {
 
 // --- DRAG MINIATURE & FLIP ---
 
-// Logique partagée souris + touch pour le drag de la miniature
 function startMiniDrag(clientX, clientY) {
     setIsDragging(true);
     setHasDragged(false);
@@ -141,7 +129,6 @@ function startMiniDrag(clientX, clientY) {
 }
 
 function moveMiniDrag(clientX, clientY) {
-    // Seuil 5px avant de considérer que c'est un vrai drag (pas un tap)
     if (!hasDragged) {
         const dx = clientX - (miniBox._dragStartX + photoContainer.getBoundingClientRect().left - 14);
         const dy = clientY - (miniBox._dragStartY + photoContainer.getBoundingClientRect().top  - 14);
@@ -158,14 +145,12 @@ function endMiniDrag() {
     setIsDragging(false);
 
     if (!hasDragged) {
-        // Tap / clic simple → flip avant/arrière
         const newFlipped = !isFlipped;
         setIsFlipped(newFlipped);
         const p = currentPhotos[currentIndex];
         mainPhoto.src = newFlipped ? p.front : p.back;
         document.getElementById('mini-photo').src = newFlipped ? p.back : p.front;
     } else {
-        // Drag terminé → snap gauche ou droite
         setJustFinishedDrag(true);
         miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
         const snapRight = (miniBox.getBoundingClientRect().left + miniBox.offsetWidth / 2) >
@@ -175,7 +160,6 @@ function endMiniDrag() {
             ? `translate(${photoContainer.offsetWidth - miniBox.offsetWidth - 28}px, 0px)`
             : 'translate(0px, 0px)';
 
-        // Animation du compteur vers le côté opposé à la miniature
         if (counter) {
             counter.classList.toggle('from-left', snapRight);
             counter.classList.add('switching');
@@ -211,14 +195,12 @@ document.addEventListener('mouseup', () => {
 });
 
 // ── Touch miniature ──────────────────────────────────────────────────────────
-// passive: false + preventDefault() indispensables pour empêcher la propagation
-// vers photoContainer (qui sinon déclencherait le long-press timer sur la mini)
 miniBox.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) return;
     const t = e.touches[0];
     startMiniDrag(t.clientX, t.clientY);
     e.stopPropagation();
-    e.preventDefault(); // bloque le long-press de photoContainer
+    e.preventDefault();
 }, { passive: false });
 
 miniBox.addEventListener('touchmove', (e) => {
@@ -245,7 +227,6 @@ function updateTransform() {
     mainPhoto.style.transform = `scale(${zoomScale}) translate(${translateX}px, ${translateY}px)`;
 }
 
-// Reset instantané — utilisé lors du changement de photo ou fermeture de modale
 export function resetZoomState() {
     setIsZooming(false);
     setZoomScale(1);
@@ -256,7 +237,6 @@ export function resetZoomState() {
     photoContainer.classList.remove('zoomed');
 }
 
-// Reset animé — utilisé au relâchement après un pan, repart depuis la position courante
 function smoothResetZoom() {
     setIsZooming(false);
     mainPhoto.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
@@ -292,20 +272,20 @@ function handlePan(x, y) {
     updateTransform();
 }
 
-// ── Souris desktop : clic maintenu = zoom ───────────────────────────────────
+// ── Souris desktop ───────────────────────────────────────────────────────────
 photoContainer.addEventListener('mousedown', (e) => {
     if (!e.target.closest('.mini-img-container')) startZoom(e.clientX, e.clientY);
 });
 
 // ── Touch — pinch & long-press zoom ─────────────────────────────────────────
-let _isPinching     = false;   // true quand ≥2 doigts sur la photo
-let _pinchStartDist = 0;       // distance inter-doigts au début du pinch
-let _pinchStartScale = 1;      // zoomScale au début du pinch
-let _pinchMidX      = 0;       // milieu du pinch (pour le pan)
-let _pinchMidY      = 0;
-let _longPressTimer = null;    // timer pour le long-press 1 doigt
-let _touchStartX    = 0;       // position du doigt au touchstart (pour le long-press)
-let _touchStartY    = 0;
+let _isPinching      = false;
+let _pinchStartDist  = 0;
+let _pinchStartScale = 1;
+let _pinchMidX       = 0;
+let _pinchMidY       = 0;
+let _longPressTimer  = null;
+let _touchStartX     = 0;
+let _touchStartY     = 0;
 
 function pinchDist(touches) {
     const dx = touches[0].clientX - touches[1].clientX;
@@ -320,36 +300,30 @@ function pinchMid(touches) {
 }
 
 photoContainer.addEventListener('touchstart', (e) => {
-    // Ignore si c'est sur la miniature (géré par ses propres listeners)
     if (e.target.closest('.mini-img-container')) return;
 
     if (e.touches.length === 2) {
-        // ── Pinch start ──────────────────────────────────────
         clearTimeout(_longPressTimer);
-        _longPressTimer = null;
+        _longPressTimer  = null;
         _isPinching      = true;
         _pinchStartDist  = pinchDist(e.touches);
-        _pinchStartScale = zoomScale > 1 ? zoomScale : 1; // repart du zoom courant
+        _pinchStartScale = zoomScale > 1 ? zoomScale : 1;
         const mid = pinchMid(e.touches);
         _pinchMidX = mid.x;
         _pinchMidY = mid.y;
-        // Active le mode zoom si pas déjà actif
         if (!isZooming) {
             setIsZooming(true);
             photoContainer.classList.add('zoomed');
             mainPhoto.style.transformOrigin = '50% 50%';
         }
-        e.preventDefault(); // évite le zoom natif du navigateur
+        e.preventDefault();
     } else if (e.touches.length === 1 && !_isPinching) {
-        // ── Long-press start (1 doigt) ────────────────────────
-        // isDragging = true signifie que le touchstart vient de la miniature
-        // (son listener s'est déclenché en premier mais preventDefault peut avoir raté)
         if (isDragging) return;
         _touchStartX = e.touches[0].clientX;
         _touchStartY = e.touches[0].clientY;
         _longPressTimer = setTimeout(() => {
             _longPressTimer = null;
-            if (isDragging) return; // sécurité supplémentaire
+            if (isDragging) return;
             startZoom(e.touches[0].clientX, e.touches[0].clientY);
         }, 150);
     }
@@ -359,23 +333,18 @@ photoContainer.addEventListener('touchmove', (e) => {
     if (e.target.closest('.mini-img-container')) return;
 
     if (_isPinching && e.touches.length === 2) {
-        // ── Pinch move : mise à l'échelle + pan ──────────────
         const dist     = pinchDist(e.touches);
         const rawScale = _pinchStartScale * (dist / _pinchStartDist);
         const clamped  = Math.max(1, Math.min(rawScale, 4));
         setZoomScale(clamped);
-
         const mid = pinchMid(e.touches);
         handlePan(mid.x, mid.y);
         _pinchMidX = mid.x;
         _pinchMidY = mid.y;
-
         mainPhoto.style.transition = 'none';
         updateTransform();
         e.preventDefault();
     } else if (isZooming && !_isPinching && e.touches.length === 1) {
-        // ── Pan 1 doigt (après long-press activé) ────────────
-        // Annule le long-press si l'utilisateur bouge trop tôt
         if (_longPressTimer) {
             const dx = e.touches[0].clientX - _touchStartX;
             const dy = e.touches[0].clientY - _touchStartY;
@@ -393,64 +362,49 @@ photoContainer.addEventListener('touchmove', (e) => {
 photoContainer.addEventListener('touchend', (e) => {
     if (e.target.closest('.mini-img-container')) return;
 
-    // Annule le long-press si le doigt se lève avant les 150ms
     if (_longPressTimer) {
         clearTimeout(_longPressTimer);
         _longPressTimer = null;
     }
 
     if (_isPinching) {
-        // Fin du pinch : on reste zoomé si scale > 1, sinon on reset
         _isPinching = false;
         if (zoomScale <= 1.05) {
             setJustFinishedDrag(true);
             smoothResetZoom();
             setTimeout(() => setJustFinishedDrag(false), 350);
         }
-        // Garde le zoom en place (pas de smoothReset) → l'utilisateur voit le résultat
         return;
     }
 
     if (isZooming && e.touches.length === 0) {
-        // Fin du pan 1 doigt → reset zoom
         setJustFinishedDrag(true);
         smoothResetZoom();
         setTimeout(() => setJustFinishedDrag(false), 350);
     }
 }, { passive: true });
 
-// --- SWIPE MOBILE (navigation entre photos d'un cluster) ---
-// Seuil : 40px horizontal minimum, dérive verticale max 70px
-const SWIPE_THRESHOLD   = 40;
-const SWIPE_MAX_VDRIFT  = 70;
+// --- SWIPE MOBILE ---
+const SWIPE_THRESHOLD  = 40;
+const SWIPE_MAX_VDRIFT = 70;
 
 let _swipeTouchStartX = 0;
 let _swipeTouchStartY = 0;
 let _swipeActive      = false;
 
-// Crée ou met à jour le hint discret sous la photo
-// Affiché à chaque ouverture de modal multi-photos, disparaît après un vrai swipe
-// Crée le nœud hint et le fait apparaître — appelé une seule fois par openModal,
-// APRÈS que modal.style.display = 'flex' soit posé
 function _showHint() {
     document.getElementById('swipe-hint')?.remove();
     const hint = document.createElement('div');
     hint.id = 'swipe-hint';
     modal.appendChild(hint);
     _setHintText(hint);
-    console.log('[hint] _showHint — créé, texte:', hint.textContent);
-    setTimeout(() => {
-        hint.classList.add('swipe-hint--in');
-        console.log('[hint] setTimeout — classe ajoutée, opacity attendue 1');
-    }, 0);
+    setTimeout(() => hint.classList.add('swipe-hint--in'), 0);
 }
 
 function _updateSwipeHint(show) {
     const hint = document.getElementById('swipe-hint');
-    console.log('[hint] _updateSwipeHint — show:', show, '| hint dans DOM:', !!hint);
     if (!show || !hint) return;
     _setHintText(hint);
-    console.log('[hint] texte mis à jour:', hint.textContent);
 }
 
 function _setHintText(hint) {
@@ -464,16 +418,6 @@ function _setHintText(hint) {
         hint.innerHTML = '<span class="hint-arrows">&lsaquo;&lsaquo;&lsaquo;</span> swipe <span class="hint-arrows">&rsaquo;&rsaquo;&rsaquo;</span>';
 }
 
-function _dismissSwipeHint() {
-    const hint = document.getElementById('swipe-hint');
-    console.log('[hint] _dismissSwipeHint — hint dans DOM:', !!hint);
-    if (!hint) return;
-    hint.classList.remove('swipe-hint--in');
-    setTimeout(() => hint.remove(), 300);
-}
-
-// Swipe sur tout le modal (plein écran) — uniquement mobile
-// Les guards isDragging/isZooming/_isPinching évitent tout conflit avec zoom/drag mini
 modal.addEventListener('touchstart', (e) => {
     if (!window.matchMedia('(pointer: coarse)').matches) return;
     if (currentPhotos.length <= 1) return;
@@ -494,13 +438,11 @@ modal.addEventListener('touchend', (e) => {
     if (Math.abs(dy) > SWIPE_MAX_VDRIFT) return;
     if (Math.abs(dx) < SWIPE_THRESHOLD)  return;
 
-    // Vérifie qu'on n'est pas aux extrémités avant d'agir
     const canNext = currentIndex < currentPhotos.length - 1;
     const canPrev = currentIndex > 0;
 
-    if (dx < 0 && canNext)      { nextPhoto(); }
-    else if (dx > 0 && canPrev) { prevPhoto(); }
-    // Aux extrémités : swipe ignoré, hint reste affiché
+    if (dx < 0 && canNext)      nextPhoto();
+    else if (dx > 0 && canPrev) prevPhoto();
 }, { passive: true });
 
 // --- BOUTON REPLACER ---
@@ -510,9 +452,10 @@ document.getElementById('replace-button')?.addEventListener('click', () => {
     setIsRelocating(true);
     closeModal();
     document.getElementById('map').style.cursor = 'crosshair';
-    // Dispatch pour que app.js puisse allumer le highlight sur le bon marker
+    let loc = photo.location;
+    if (typeof loc === 'string') { try { loc = JSON.parse(loc); } catch { loc = null; } }
     document.dispatchEvent(new CustomEvent('app:relocation-start', {
-        detail: { uid: photo.uid, rawDate: photo.rawDate }
+        detail: { uid: photo.uid, rawDate: photo.rawDate, location: loc }
     }));
 });
 
@@ -520,15 +463,12 @@ document.getElementById('replace-button')?.addEventListener('click', () => {
 document.getElementById('prevBtn')?.addEventListener('click', prevPhoto);
 document.getElementById('nextBtn')?.addEventListener('click', nextPhoto);
 
-// --- FERMETURE AU TAP HORS PHOTO (mobile) ---
-// Sur desktop : clic sur le fond noir = ferme (comportement existant)
-// Sur mobile : tap sur caption, footer, username, fond = ferme aussi
-// Zones protégées : photo principale, miniature, flèches nav, bouton replacer
+// --- FERMETURE AU TAP HORS PHOTO ---
 modal?.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
 
 const PROTECTED_SELECTORS = [
-    '#photo-container',   // photo principale + zone zoom
-    '.mini-img-container',// miniature
+    '#photo-container',
+    '.mini-img-container',
     '#prevBtn',
     '#nextBtn',
     '#replace-button',

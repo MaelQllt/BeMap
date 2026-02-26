@@ -289,7 +289,7 @@
 /* ── Ring animé relocation ────────────────────────────────── */
 @keyframes relocRing {
     0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.9; }
-    50%  { transform: translate(-50%, -50%) scale(2.2); opacity: 0.3; }
+    50%  { transform: translate(-50%, -50%) scale(1.5); opacity: 0.3; }
     100% { transform: translate(-50%, -50%) scale(1);   opacity: 0.9; }
 }
 
@@ -298,16 +298,30 @@
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 3px 6px rgba(0,0,0,0.8);
 }
 
-/* Le ring est sur l'inner (dimensions connues) pas sur marker-anchor (width: auto) */
-.marker--relocating .custom-point-marker::before,
-.marker--relocating .custom-cluster-label::before {
+/* Ring sur point individuel (14px → ring ~28px) */
+.marker--relocating .custom-point-marker::before {
     content: '';
     position: absolute;
     top: 50%; left: 50%;
-    width: 100%; height: 100%;
+    width: 28px; height: 28px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, 0.85);
     animation: relocRing 1.2s ease-in-out infinite;
     pointer-events: none;
     z-index: 10;
+    transform: translate(-50%, -50%);
+}
+
+/* Ring sur cluster (36px → ring ~56px), noir pour contraster */
+.marker--relocating .custom-cluster-label::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: 2.5px solid rgba(0, 0, 0, 0.85);
+    animation: relocRing 1.2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+    transform: translate(-50%, -50%);
 }

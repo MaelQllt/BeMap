@@ -14,7 +14,7 @@ import { initTimeline, applyFiltersToMap } from './timeline.js';
 import { initFilters, buildFiltersUI, closeFilters } from './filters.js';
 
 setMapRef(map);
-let _saveDebounceTimer = null; // debounce pour saveFileToSession après relocation
+let _saveDebounceTimer = null;
 
 // --- TOAST INLINE CARTE ---
 function showMapToast(message, type = 'success') {
@@ -27,8 +27,6 @@ function showMapToast(message, type = 'success') {
     toast.innerText = message;
 
     document.getElementById('map').appendChild(toast);
-
-    // Force reflow pour que la transition CSS s'applique
     toast.getBoundingClientRect();
     toast.classList.add('map-toast--visible');
 
@@ -63,8 +61,6 @@ if (localStorage.getItem('bereal_session_active') === 'true') {
 export function convertMemoriesToGeoJSON(data) {
     const seenIds = new Set();
     return data.map(m => {
-        // Utilise berealMoment en priorité, sinon takenTime complet (timestamp précis) pour éviter
-        // les faux positifs entre deux BeReal distincts tombant le même jour
         const momentId = m.berealMoment || m.takenTime || m.date;
         const isBonus = seenIds.has(momentId);
         seenIds.add(momentId);
@@ -72,10 +68,6 @@ export function convertMemoriesToGeoJSON(data) {
         const lng = parseFloat(m.location?.longitude);
         const lat = parseFloat(m.location?.latitude);
 
-        // Calcul local, sans muter m — pour ne pas polluer allMemoriesData
-        // ni persister canBeRelocated dans l'export JSON.
-        // Repositionnable si : coords absentes/nulles OU déjà déplacé dans cette session (_relocated).
-        // Après export/réimport, _relocated est absent → seuls les 0,0 sont repositionnables.
         const canBeRelocated = m._relocated === true
             || ((isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0));
 
@@ -88,7 +80,6 @@ export function convertMemoriesToGeoJSON(data) {
                 caption:  m.caption || "",
                 location: m.location,
                 rawDate:  m.takenTime,
-                // ID unique stable pour la relocation (takenTime + index dans le tableau original)
                 uid:      m.uid ?? m.takenTime,
                 canBeRelocated,
                 date:     m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
@@ -130,12 +121,10 @@ async function initApp(userData, memoriesData, friendsData) {
     syncPWAHeight();
 }
 
-// --- REPOSITIONNEMENT D'UN BEREAL ---
-// Allume le highlight sur le marker dès que le mode relocation démarre
+// --- REPOSITIONNEMENT ---
 document.addEventListener('app:relocation-start', (e) => {
-    const { uid, rawDate } = e.detail;
-    // Léger délai pour laisser closeModal() finir (setMapFocus remet les layers)
-    requestAnimationFrame(() => showRelocationHighlight(uid, rawDate));
+    const { uid, rawDate, location } = e.detail;
+    setTimeout(() => showRelocationHighlight(uid, rawDate, location), 150);
 });
 
 map.on('click', async (e) => {
@@ -143,7 +132,6 @@ map.on('click', async (e) => {
 
     const { lng, lat } = e.lngLat;
 
-    // Recherche par uid en priorité, fallback rawDate — évite les collisions sur timestamp identique
     const index = allMemoriesData.findIndex(m =>
         (m.uid != null && m.uid === memoryToUpdate.uid) ||
         m.takenTime === memoryToUpdate.rawDate
@@ -154,10 +142,8 @@ map.on('click', async (e) => {
     }
 
     allMemoriesData[index].location  = { latitude: lat, longitude: lng };
-    allMemoriesData[index]._relocated = true; // flag session : permet de re-déplacer dans la même session
+    allMemoriesData[index]._relocated = true;
 
-    // Debounce : on diffère la sérialisation de 1 s pour absorber les repositionnements rapides successifs.
-    // La carte et l'UI sont mis à jour immédiatement — seule l'écriture IndexedDB est retardée.
     clearTimeout(_saveDebounceTimer);
     _saveDebounceTimer = setTimeout(async () => {
         const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
@@ -192,13 +178,11 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
     const statusMsg = document.getElementById('status-msg');
     const newFileMap = {};
 
-    // Indexation du fileMap en mémoire (pas de I/O ici)
     for (const file of files) {
         const path = file.webkitRelativePath.split('/').slice(1).join('/');
         newFileMap[path] = file;
     }
 
-    // Sauvegarde en session par batches de 25 fichiers en parallèle
     const BATCH_SIZE = 25;
     const entries = Object.entries(newFileMap);
     for (let i = 0; i < entries.length; i += BATCH_SIZE) {
@@ -215,7 +199,6 @@ document.getElementById('folder-input').addEventListener('change', async (e) => 
 
         const userData     = JSON.parse(await newFileMap['user.json'].text());
         const memoriesData = JSON.parse(await memoriesFile.text());
-        // Fix : fallback [] si friends.json absent, comme dans l'auto-login
         const friendsData  = newFileMap['friends.json']
             ? JSON.parse(await newFileMap['friends.json'].text())
             : [];
@@ -269,8 +252,6 @@ async function handleAutoLogin() {
 }
 
 // --- RACCOURCIS CLAVIER ---
-// F → filters.js, T/Escape timeline → timeline.js
-// Ici : navigation photo, flèches dashboard, relocation Échap
 document.addEventListener('keydown', (e) => {
     if (['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
 
@@ -282,7 +263,6 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    // Annulation du mode relocation via Échap
     if (e.key === 'Escape' && isRelocating) {
         setIsRelocating(false);
         clearRelocationHighlight();

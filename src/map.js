@@ -116,7 +116,6 @@ export function setMapFocus(isFocus) {
     const mapEl = document.getElementById('map');
     const badge = document.querySelector('.user-profile-header');
     const controls = document.querySelector('.map-controls');
-
     const bottomControls = document.querySelector('.bottom-controls');
 
     if (isFocus) {
@@ -126,7 +125,6 @@ export function setMapFocus(isFocus) {
         badge.style.pointerEvents = 'none';
         controls?.classList.add('frozen');
         bottomControls?.classList.add('frozen');
-        // Ferme le modal filtres et la timeline quand une modale s'ouvre
         document.dispatchEvent(new CustomEvent('app:modal-open'));
     } else {
         mapEl.style.transform = 'scale(1)';
@@ -136,7 +134,6 @@ export function setMapFocus(isFocus) {
         controls?.classList.remove('frozen');
         bottomControls?.classList.remove('frozen');
         updateMapControls();
-        // Permet à la timeline de reprendre après fermeture d'un modal BeReal
         document.dispatchEvent(new CustomEvent('app:modal-close'));
     }
 }
@@ -168,7 +165,6 @@ export function setupMapLayers(features) {
 
     reAddLayers();
 
-    // Throttle via rAF : évite de recalculer les markers à chaque frame de rendu
     let _renderPending = false;
     map.on('render', () => {
         if (_renderPending) return;
@@ -195,7 +191,6 @@ export function setupMapLayers(features) {
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
                     if (props.cluster) {
-                        const currentZoom = map.getZoom();
                         map.getSource('bereal-src').getClusterExpansionZoom(props.cluster_id, (err, expansionZoom) => {
                             if (err) return;
                             const isNullIsland = Math.abs(coords[0]) < 0.1 && Math.abs(coords[1]) < 0.1;
@@ -206,12 +201,8 @@ export function setupMapLayers(features) {
                             } else {
                                 map.getSource('bereal-src').getClusterLeaves(props.cluster_id, Infinity, 0, (err2, leaves) => {
                                     if (!err2) {
-                                        // On extrait les propriétés de chaque point du cluster
                                         const photos = leaves.map(l => l.properties).sort((a, b) => new Date(b.rawDate) - new Date(a.rawDate));
-                                        
-                                        // openModal va appeler updateModalContent() qui utilisera 
-                                        // maintenant le flag canBeRelocated de la première photo (index 0)
-                                        openModal(photos); 
+                                        openModal(photos);
                                     }
                                 });
                             }
@@ -238,8 +229,6 @@ export function setupMapLayers(features) {
     map.on('mouseleave', 'clusters', () => map.getCanvas().style.cursor = '');
 }
 
-// Mise à jour légère : change uniquement les données GeoJSON sans reconstruire la source
-// Utilisé par la timeline pour des transitions fluides
 export function updateMapData(features) {
     const src = map.getSource('bereal-src');
     if (src) {
@@ -247,7 +236,6 @@ export function updateMapData(features) {
     }
 }
 
-// Reconstruit complètement la source et les layers
 export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
     Object.values(clusterMarkers).forEach(m => m.remove());
     setClusterMarkers({});
@@ -271,46 +259,57 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
 }
 
 // --- HIGHLIGHT RELOCATION ---
-// Affiche un ring animé sur le marker correspondant au BeReal en cours de relocation.
-// uid/rawDate correspondent aux propriétés du feature GeoJSON.
-let _relocHighlightEl  = null;
-let _relocGhostMarker  = null; // marker fantôme quand le point est dans un cluster
+let _relocHighlightEl = null;
 
-export function showRelocationHighlight(uid, rawDate) {
+export function showRelocationHighlight(uid, rawDate, location) {
     clearRelocationHighlight();
 
-    // Cherche le feature dans la source (point individuel OU dans un cluster)
-    const allFeatures = map.querySourceFeatures('bereal-src');
-    const match = allFeatures.find(f =>
-        (uid     != null && f.properties.uid     === uid) ||
-        (rawDate != null && f.properties.rawDate === rawDate)
-    );
-    if (!match) return;
-
-    const coords = match.geometry.coordinates;
-
-    // Cas 1 : le marker individuel est visible sur la carte
-    for (const [id, marker] of Object.entries(clusterMarkers)) {
-        if (id.startsWith('c-')) continue;
-        const mCoords = marker.getLngLat();
-        if (Math.abs(mCoords.lng - coords[0]) > 0.00001) continue;
-        const el = marker.getElement();
-        el.classList.add('marker--relocating');
-        _relocHighlightEl = el;
-        return;
+    // Coordonnées passées depuis le dispatch (null si BeReal sans localisation → stocké en 0,0)
+    let coords = null;
+    if (location) {
+        const loc = typeof location === 'string' ? JSON.parse(location) : location;
+        if (loc?.longitude != null && loc?.latitude != null &&
+            !(loc.longitude === 0 && loc.latitude === 0)) {
+            coords = [loc.longitude, loc.latitude];
+        }
     }
 
-    // Cas 2 : le point est dans un cluster — on crée un marker fantôme
-    const ghostEl = document.createElement('div');
-    ghostEl.className = 'marker-anchor marker--relocating';
-    const inner = document.createElement('div');
-    inner.className = 'custom-point-marker';
-    ghostEl.appendChild(inner);
+    // Cas 1 : coords valides → cherche un marker individuel proche
+    if (coords) {
+        for (const [id, marker] of Object.entries(clusterMarkers)) {
+            if (id.startsWith('c-')) continue;
+            const m = marker.getLngLat();
+            if (Math.abs(m.lng - coords[0]) > 0.01 || Math.abs(m.lat - coords[1]) > 0.01) continue;
+            const el = marker.getElement();
+            el.classList.add('marker--relocating');
+            _relocHighlightEl = el;
+            return;
+        }
+        // Marker individuel non trouvé → fallback cluster search
+    }
 
-    _relocGhostMarker = new maplibregl.Marker({ element: ghostEl, anchor: 'center' })
-        .setLngLat(coords)
-        .addTo(map);
-    _relocHighlightEl = ghostEl;
+    // Cas 2 : point dans un cluster (ou coords 0,0)
+    // → parcourt chaque cluster visible et cherche le uid dans ses leaves
+    const src = map.getSource('bereal-src');
+    const clusters = Object.entries(clusterMarkers).filter(([id]) => id.startsWith('c-'));
+
+    let pending = clusters.length;
+    for (const [id, marker] of clusters) {
+        const clusterId = parseInt(id.slice(2));
+        src.getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+            pending--;
+            if (err || _relocHighlightEl) return;
+            const found = leaves.some(l =>
+                (uid     != null && l.properties.uid     === uid) ||
+                (rawDate != null && l.properties.rawDate === rawDate)
+            );
+            if (found) {
+                const el = marker.getElement();
+                el.classList.add('marker--relocating');
+                _relocHighlightEl = el;
+            }
+        });
+    }
 }
 
 export function clearRelocationHighlight() {
@@ -318,14 +317,9 @@ export function clearRelocationHighlight() {
         _relocHighlightEl.classList.remove('marker--relocating');
         _relocHighlightEl = null;
     }
-    if (_relocGhostMarker) {
-        _relocGhostMarker.remove();
-        _relocGhostMarker = null;
-    }
 }
 
-// Ajuste le rayon de clustering selon le niveau de zoom.
-// onRadiusChange() est appelé sans argument — le caller fournit les données filtrées courantes.
+// --- ZOOM RADIUS ---
 export function watchZoomRadius(onRadiusChange) {
     map.on('zoomend', () => {
         const zoom = map.getZoom();
@@ -383,17 +377,15 @@ northBtn?.addEventListener('click', () => { map.easeTo({ bearing: 0, duration: 8
 pitchBtn?.addEventListener('click', () => map.easeTo({ pitch: 0, duration: 800 }));
 document.getElementById('terrain-button')?.addEventListener('click', toggleTerrain);
 
-// --- PROXIMITÉ SOURIS — Bouton terrain + boutons bas-droit ---
+// --- PROXIMITÉ SOURIS ---
 const PROXIMITY_PX = 100;
 
 document.addEventListener('mousemove', (e) => {
-    // Terrain
     if (terrainBtn) {
         const r = terrainBtn.getBoundingClientRect();
         const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
         terrainBtn.classList.toggle('nearby', dist < PROXIMITY_PX);
     }
-    // Boutons bas-droit (timeline + filtres)
     document.querySelectorAll('.bottom-ctrl-btn').forEach(btn => {
         const r = btn.getBoundingClientRect();
         const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
