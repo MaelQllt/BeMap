@@ -273,39 +273,54 @@ export function refreshMapMarkers(data, convertMemoriesToGeoJSON) {
 // --- HIGHLIGHT RELOCATION ---
 // Affiche un ring animé sur le marker correspondant au BeReal en cours de relocation.
 // uid/rawDate correspondent aux propriétés du feature GeoJSON.
-let _relocHighlightEl = null;
+let _relocHighlightEl  = null;
+let _relocGhostMarker  = null; // marker fantôme quand le point est dans un cluster
 
 export function showRelocationHighlight(uid, rawDate) {
     clearRelocationHighlight();
-    // Cherche le marker dont les features correspondent
-    for (const [id, marker] of Object.entries(clusterMarkers)) {
-        if (id.startsWith('c-')) continue; // on ignore les clusters
-        const el = marker.getElement();
-        // On identifie le marker via son id qui encode les coords — on doit
-        // retrouver via querySourceFeatures pour avoir les props
-        const features = map.querySourceFeatures('bereal-src', {
-            filter: ['!', ['has', 'point_count']]
-        });
-        const match = features.find(f =>
-            (uid   != null && f.properties.uid     === uid) ||
-            (rawDate       && f.properties.rawDate === rawDate)
-        );
-        if (!match) continue;
-        // Vérifie que ce marker est bien celui du feature trouvé
-        const coords   = marker.getLngLat();
-        const fCoords  = match.geometry.coordinates;
-        if (Math.abs(coords.lng - fCoords[0]) > 0.00001) continue;
 
+    // Cherche le feature dans la source (point individuel OU dans un cluster)
+    const allFeatures = map.querySourceFeatures('bereal-src');
+    const match = allFeatures.find(f =>
+        (uid     != null && f.properties.uid     === uid) ||
+        (rawDate != null && f.properties.rawDate === rawDate)
+    );
+    if (!match) return;
+
+    const coords = match.geometry.coordinates;
+
+    // Cas 1 : le marker individuel est visible sur la carte
+    for (const [id, marker] of Object.entries(clusterMarkers)) {
+        if (id.startsWith('c-')) continue;
+        const mCoords = marker.getLngLat();
+        if (Math.abs(mCoords.lng - coords[0]) > 0.00001) continue;
+        const el = marker.getElement();
         el.classList.add('marker--relocating');
         _relocHighlightEl = el;
-        break;
+        return;
     }
+
+    // Cas 2 : le point est dans un cluster — on crée un marker fantôme
+    const ghostEl = document.createElement('div');
+    ghostEl.className = 'marker-anchor marker--relocating';
+    const inner = document.createElement('div');
+    inner.className = 'custom-point-marker';
+    ghostEl.appendChild(inner);
+
+    _relocGhostMarker = new maplibregl.Marker({ element: ghostEl, anchor: 'center' })
+        .setLngLat(coords)
+        .addTo(map);
+    _relocHighlightEl = ghostEl;
 }
 
 export function clearRelocationHighlight() {
     if (_relocHighlightEl) {
         _relocHighlightEl.classList.remove('marker--relocating');
         _relocHighlightEl = null;
+    }
+    if (_relocGhostMarker) {
+        _relocGhostMarker.remove();
+        _relocGhostMarker = null;
     }
 }
 

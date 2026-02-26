@@ -173,3 +173,44 @@
 .replace-btn:active {
     transform: scale(0.95); /* Effet de pression */
 }
+
+/* --- SWIPE HINT (mobile cluster) --- */
+#swipe-hint {
+    position: fixed;
+    bottom: calc(28px + env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(6px);
+    color: rgba(255, 255, 255, 0.28);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    z-index: 10000;
+}
+
+#swipe-hint.swipe-hint--in {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+#swipe-hint .hint-brand {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.45);
+    letter-spacing: -0.3px;
+}
+
+#swipe-hint .hint-arrows {
+    color: rgba(255, 255, 255, 0.18);
+    font-size: 10px;
+    letter-spacing: -1px;
+}
+
+/* Empêche la sélection de texte pendant long-press / zoom */
+#bereal-modal {
+    -webkit-user-select: none;
+    user-select: none;
+}
