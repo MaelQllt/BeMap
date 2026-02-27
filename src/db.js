@@ -94,6 +94,9 @@ export async function checkDifferencesAndShowExport() {
 
     if (!current || !original) {
         exportBtn.style.display = 'none';
+        const logoutBtns = document.querySelectorAll('.logout-card-minimal');
+        const logoutLabel = logoutBtns[logoutBtns.length - 1]?.querySelector('.logout-label-minimal');
+        if (logoutLabel) logoutLabel.textContent = 'Déconnexion / Changer d\'archive';
         return;
     }
 
@@ -101,4 +104,11 @@ export async function checkDifferencesAndShowExport() {
     const ori = new Uint8Array(original.buffer);
     const isDifferent = cur.length !== ori.length || cur.some((val, i) => val !== ori[i]);
     exportBtn.style.setProperty('display', isDifferent ? 'inline-flex' : 'none', isDifferent ? 'important' : '');
+
+    // Adapte le label du bouton déconnexion selon la présence de l'export
+    const logoutBtns = document.querySelectorAll('.logout-card-minimal');
+    const logoutLabel = logoutBtns[logoutBtns.length - 1]?.querySelector('.logout-label-minimal');
+    if (logoutLabel) {
+        logoutLabel.textContent = isDifferent ? 'Déconnexion' : 'Déconnexion / Changer d\'archive';
+    }
 }

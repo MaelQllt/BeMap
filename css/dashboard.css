@@ -497,113 +497,278 @@
     overflow: hidden;
 }
 
-/* ── MOBILE — Réduction proportionnelle, disposition inchangée ── */
-@media (pointer: coarse) and (max-width: 480px) {
 
+/* --- ADAPTATION MOBILE --- */
+@media (max-width: 768px) {
+    /* 1. On donne plus de place à la boîte blanche */
     .dashboard-positioner {
-        width: 92%;
+        top: 50% !important; /* On remonte légèrement au-dessus du centre (50% -> 45%) */
+        transform: translateY(-50%);
+        width: 92% !important; /* Un peu plus d'air sur les côtés */
+        margin: 0 auto !important; /* On annule le margin: auto global */
+        left: 0;
+        right: 0;
     }
 
+    .dash-pagination {
+        display: flex !important;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        margin: 15px 0 10px 0;
+        padding: 0 !important; /* On retire tout padding qui pourrait décentrer */
+        left: 0;
+    }
+
+    .dashboard-content {
+        padding: 25px 0 15px 0 !important; /* Moins d'espace en bas */
+        max-height: 85vh; /* Sécurité pour les petits écrans */
+        overflow-y: auto;
+    }
+
+
+    .dashboard-header {
+        padding: 0 25px;
+        margin-left: 0;
+        margin-right: 0;
+    }
+
+    .logout-wrapper {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap;
+        justify-content: center !important;
+        align-items: center !important;
+        gap: 10px;
+        width: 100% !important;
+        padding: 10px 25px !important;
+        margin: 0 !important;
+        box-sizing: border-box;
+    }
+
+    /* 2. FIX DU SLIDER : Crucial pour que rien ne soit resserré */
+    #dash-cards-wrapper {
+        width: 100% !important;
+        margin: 0 !important;
+        overflow-x: auto !important;
+        display: block !important; /* Important */
+    }
+
+    #dash-slider {
+        display: flex !important;
+        width: 300% !important; /* 3 pages = 300% */
+        gap: 0 !important;
+        padding: 0 !important;
+    }
+
+    .dash-page {
+        width: 33.333333% !important; /* Équivaut à 100% du wrapper */
+        flex-shrink: 0 !important;
+        padding: 0 20px !important; /* Espace interne pour respirer */
+        box-sizing: border-box !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+
+    /* 3. FIX PAGE 3 (Graphique) */
+    .chart-page-inner {
+        min-height: 250px; /* Force une hauteur pour que le graph ne disparaisse pas */
+        width: 100%;
+    }
+    
+    .chart-canvas-wrapper {
+        height: 200px !important; /* Hauteur fixe sur mobile pour le confort */
+    }
+    
+    /* 4. AJUSTEMENT DES CARTES */
+    .stat-card {
+        padding: 15px 10px;
+        min-height: 100px;
+    }
+    
+    .stat-value {
+        font-size: 28px; /* On réduit un peu pour que ça rentre sur iPhone SE */
+    }
+}
+
+
+@media (max-height: 700px) and (max-width: 768px) {
     .dashboard-content {
         padding: 20px;
         border-radius: 28px;
     }
-
-    .dashboard-blur-bg {
-        border-radius: 28px;
-    }
-
-    .dashboard-header {
-        margin-bottom: 20px;
-    }
-
-    .dashboard-title {
-        font-size: 20px;
-        letter-spacing: -1px;
-    }
-
-    .close-dash {
-        width: 30px;
-        height: 30px;
-    }
-
-    /* Cards stats */
-    .stat-card {
-        padding: 16px 10px;
-        min-height: 90px;
-        border-radius: 18px;
-    }
-
     .stat-value {
         font-size: 28px;
     }
+    .stat-card {
+        min-height: 100px;
+    }
+}
 
-    .stat-label {
-        font-size: 8px;
-        letter-spacing: 0.8px;
-        margin-top: 5px;
+/* --- PAGINATION --- */
+.dash-pagination {
+    display: flex !important; /* Force l'affichage */
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 20px 0;
+    width: 100%;
+    position: relative;
+    z-index: 100;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    transition: background 0.3s ease;
+}
+
+.dot.active {
+    background: #ffffff !important;
+}
+
+/* --- STRUCTURE MOBILE --- */
+@media (max-width: 768px) {
+    #dashboard-modal {
+        align-items: flex-start; /* Évite que le clavier ou autre décale tout */
+        padding-top: 20px;
     }
 
-    /* Streak cards */
-    .streak-card {
-        height: 80px;
-        padding: 0 18px;
-        border-radius: 20px;
+    .dashboard-positioner {
+        width: 100%;
+        max-width: 100%;
     }
 
-    .streak-value {
-        font-size: 32px;
-    }
-
-    .streak-label {
-        font-size: 8px;
-    }
-
-    .streak-icon {
-        font-size: 30px;
-    }
-
-    /* Grid gap */
-    .stats-grid {
-        gap: 10px;
-    }
-
-    /* Slider wrapper — compense le padding réduit */
     #dash-cards-wrapper {
-        margin-left: -20px;
-        width: calc(100% + 40px);
-        padding: 10px 0;
+        width: 100%;
+        overflow-x: auto !important;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        margin-left: 0 !important;
+    }
+
+    #dash-slider {
+        display: flex !important;
+        width: 300% !important; /* Pour 3 pages */
+        transform: none !important; /* Bloque le JS de bureau */
     }
 
     .dash-page {
-        padding: 0 20px;
+        width: 33.333333% !important; /* Équivalent à 100% de la largeur du wrapper */
+        flex-shrink: 0 !important;   /* INTERDIT à la page de rétrécir */
+        scroll-snap-align: center;
+        padding: 0 20px;             /* Marge interne pour que la carte ne touche pas les bords */
+        box-sizing: border-box;
+        display: flex !important;
+        justify-content: center;
     }
 
-    /* Flèches nav : rentrées à l'intérieur sur mobile (pas de place hors du card) */
-    .prev-dash {
-        left: -8px !important;
-        width: 36px;
-        height: 36px;
+    .stats-grid, .streak-card {
+        width: 100%; /* S'assure que le contenu remplit la page centrée */
     }
 
-    .next-dash {
-        right: -8px !important;
-        width: 36px;
-        height: 36px;
+    /* Taille de police réduite pour la date d'arrivée */
+    #stat-join-date {
+        font-size: 24px !important;
     }
 
-    /* Boutons logout/export */
-    .logout-wrapper {
-        padding: 10px 0px;
-        gap: 8px;
+    /* Croix totalement figée — couleurs forcées en JS, on bloque juste le highlight */
+    .close-dash {
+        -webkit-tap-highlight-color: transparent !important;
     }
 
-    .logout-card-minimal,
-    #export-json-btn {
-        padding: 6px 14px;
+    /* Best month label : retour à la ligne avant le compteur */
+    #stat-best-month-label {
+        text-align: center;
+        white-space: pre-line;
     }
 
-    .logout-label-minimal {
-        font-size: 9px;
+    /* Flèches de navigation : masquées sur mobile (swipe suffit) */
+    .dash-nav {
+        display: none !important;
+    }
+
+}
+
+/* ── MOBILE : zéro interaction sur les cards (hover: none = tactile) ── */
+@media (hover: none) {
+    /* Tout neutraliser par défaut */
+    .dashboard-title:hover,
+    .stat-card:hover,
+    .stat-card:hover .stat-value,
+    .stat-card:hover .stat-label,
+    .streak-card:hover,
+    .streak-card:hover .streak-label,
+    .streak-card:hover .streak-icon,
+    .calendar-icon:hover,
+    .streak-card:has(#stat-join-date) .streak-icon:hover,
+    .close-dash:hover,
+    #export-json-btn:hover,
+    #export-json-btn:hover .logout-label-minimal,
+    .logout-wrapper .logout-card-minimal:last-child:hover,
+    .logout-wrapper .logout-card-minimal:last-child:hover .logout-label-minimal {
+        transform: none !important;
+        animation: none !important;
+        filter: none !important;
+        background: unset !important;
+        border-color: unset !important;
+        color: unset !important;
+        z-index: unset !important;
+    }
+
+    /* Exception : flamme au click (géré via JS .flame-active) */
+    .streak-icon.flame-active {
+        animation: flameWobble 0.5s ease-in-out infinite !important;
+        filter: drop-shadow(0 0 12px rgba(255, 100, 0, 0.8)) !important;
+    }
+}
+
+
+/* ── MOBILE : zéro interaction sur les cards — pointer-events coupés ── */
+@media (hover: none) {
+    .stat-card,
+    .streak-card,
+    .dashboard-title,
+    .streak-icon,
+    .flame-icon,
+    .calendar-icon {
+        pointer-events: none !important;
+        cursor: default !important;
+        -webkit-tap-highlight-color: transparent !important;
+    }
+
+    /* Reset natif complet du bouton fermer */
+    .close-dash {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        -webkit-tap-highlight-color: transparent !important;
+        background: #ffffff14 !important;
+        color: white !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    /* Boutons fonctionnels mais visuellement fixes */
+    .close-dash:active,
+    .close-dash:focus,
+    .close-dash:focus-visible,
+    .close-dash:focus-within,
+    .logout-card-minimal:active,
+    .logout-card-minimal:focus,
+    .logout-card-minimal:focus-visible,
+    #export-json-btn:active,
+    #export-json-btn:focus,
+    #export-json-btn:focus-visible {
+        -webkit-appearance: none !important;
+        appearance: none !important;
+        transform: none !important;
+        background: inherit !important;
+        border-color: inherit !important;
+        color: inherit !important;
+        filter: none !important;
+        outline: none !important;
+        box-shadow: none !important;
+        opacity: 1 !important;
     }
 }

@@ -3,7 +3,7 @@
  */
 
 import { cachedStats, setCachedStats, worldGeoCache, depsGeoCache, setWorldGeoCache, setDepsGeoCache, allMemoriesData, objectUrlCache } from './state.js';
-import { clearSession } from './db.js';
+import { clearSession, checkDifferencesAndShowExport } from './db.js';
 import { setMapFocus } from './map.js';
 
 // Re-exporté pour que app.js puisse invalider le cache après une relocation
@@ -14,6 +14,8 @@ let isAnimatingDash = false;
 
 // Fait glisser le slider vers la page suivante ou précédente
 export function switchDash(direction = 'right') {
+    if (window.innerWidth <= 768) return;
+
     if (isAnimatingDash) return;
     isAnimatingDash = true;
 
@@ -194,7 +196,7 @@ export async function calculateStats(data, userData, friendsData) {
             daysOld,
             joinDate: joinDateStr,
             bestMonthName,
-            bestMonthLabel: `MOIS RECORD (${maxPhotos} BEREALS)`,
+            bestMonthLabel: `MOIS RECORD\n(${maxPhotos} BEREALS)`,
             avgTime:          avgTimeStr,
             monthlyChartData: monthlyChartData
         });
@@ -425,6 +427,11 @@ export function updateDashboardUI() {
 export function openDashboard() {
     document.getElementById('dashboard-modal').style.display = 'flex';
     document.querySelector('.dashboard-positioner').style.display = 'flex';
+
+    // Reset scroll mobile vers page 1 (doit être fait après display:flex)
+    const wrapper = document.getElementById('dash-cards-wrapper');
+    if (wrapper) wrapper.scrollLeft = 0;
+
     // Remet les 3 pages dans l'ordre + reset position
     const slider = document.getElementById('dash-slider');
     if (slider) {
@@ -440,8 +447,13 @@ export function openDashboard() {
         }
     }
     setMapFocus(true);
+    checkDifferencesAndShowExport();
     if (cachedStats) {
         updateDashboardUI();
+        setTimeout(() => {
+            const dots = document.querySelectorAll('.dot');
+            dots.forEach((dot, idx) => dot.classList.toggle('active', idx === 0));
+        }, 10);
         requestAnimationFrame(() => {
             drawMonthlyChart(cachedStats.monthlyChartData);
             initChartHover(cachedStats.monthlyChartData);
@@ -450,43 +462,152 @@ export function openDashboard() {
 }
 
 export function closeDashboard() {
+    // 1. Cacher les éléments
     document.getElementById('dashboard-modal').style.display = 'none';
     document.querySelector('.dashboard-positioner').style.display = 'none';
+    
+    // 2. Libérer le focus carte
     setMapFocus(false);
-    // Supprime le listener document-level du chart hover pour éviter les zombies
+    
+    // 3. Nettoyer les listeners du graphique
     document.getElementById('monthly-chart')?._hoverCleanup?.();
+
+    // 4. RÉINITIALISATION DES POINTS (Pagination)
+    const dots = document.querySelectorAll('.dot');
+    dots.forEach((dot, idx) => dot.classList.toggle('active', idx === 0));
+
+    // 5. RESET SCROLL MOBILE vers la page 1 (fait à l'ouverture car display:none bloque le scroll ici)
 }
 
 // Attache tous les listeners du dashboard (appelé une seule fois au démarrage)
 export function initDashboard() {
-    document.querySelector('.prev-dash')?.addEventListener('click', () => switchDash('left'));
-    document.querySelector('.next-dash')?.addEventListener('click', () => switchDash('right'));
-    document.querySelector('.close-dash')?.addEventListener('click', closeDashboard);
+    const wrapper = document.getElementById('dash-cards-wrapper');
+    const slider = document.getElementById('dash-slider');
+    const dots = document.querySelectorAll('.dot');
 
-    // Ferme en cliquant sur le fond (overlay), pas sur la carte elle-même
+    /**
+     * Met à jour l'état visuel des points.
+     * @param {number|null} forcedIndex - Si fourni, force cet index (0, 1 ou 2)
+     */
+    const updateDots = (forcedIndex = null) => {
+        if (!dots.length) return;
+        
+        let activeIndex = 0;
+
+        if (forcedIndex !== null) {
+            activeIndex = forcedIndex;
+        } else if (window.innerWidth <= 768 && wrapper) {
+            // Mode Mobile : calculé selon la position du scroll horizontal
+            const width = wrapper.clientWidth; 
+            activeIndex = Math.round(wrapper.scrollLeft / width);
+        } else if (slider && slider.firstElementChild) {
+            // Mode Bureau : basé sur l'ID de la page actuellement en tête de liste
+            const pageId = slider.firstElementChild.id;
+            activeIndex = parseInt(pageId.replace('dash-page-', '')) - 1;
+        }
+
+        dots.forEach((dot, idx) => {
+            dot.classList.toggle('active', idx === activeIndex);
+        });
+    };
+
+    // --- NAVIGATION BUREAU (FLÈCHES) ---
+    document.querySelector('.prev-dash')?.addEventListener('click', () => {
+        if (!slider.firstElementChild) return;
+        // On calcule l'index précédent AVANT le mouvement pour éviter le lag
+        const currentPageId = slider.firstElementChild.id;
+        let prevIdx = parseInt(currentPageId.replace('dash-page-', '')) - 2;
+        if (prevIdx < 0) prevIdx = 2; // Boucle de la page 1 vers la 3
+        
+        updateDots(prevIdx);
+        switchDash('left');
+    });
+
+    document.querySelector('.next-dash')?.addEventListener('click', () => {
+        if (!slider.firstElementChild) return;
+        // On calcule l'index suivant AVANT le mouvement
+        const currentPageId = slider.firstElementChild.id;
+        let nextIdx = parseInt(currentPageId.replace('dash-page-', ''));
+        if (nextIdx > 2) nextIdx = 0; // Boucle de la page 3 vers la 1
+        
+        updateDots(nextIdx);
+        switchDash('right');
+    });
+
+    // Helper : feedback discret au tap, sans laisser d'état actif résiduel Safari
+    const tapWithScale = (el, fn) => {
+        el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+        el.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            el.style.transition = 'opacity 0.15s ease';
+            el.style.opacity = '0.5';
+            setTimeout(() => {
+                el.style.opacity = '';
+                el.blur();
+                fn(e);
+            }, 150);
+        });
+        el.addEventListener('click', fn); // fallback bureau
+    };
+
+    // Croix : couleurs figées en inline pour que Safari ne puisse pas les écraser
+    const closeDashEl = document.querySelector('.close-dash');
+    if (closeDashEl) {
+        closeDashEl.style.background = '#ffffff14';
+        closeDashEl.style.color = 'white';
+        closeDashEl.style.border = '1px solid rgba(255,255,255,0.1)';
+        closeDashEl.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
+        closeDashEl.addEventListener('touchend', (e) => { e.preventDefault(); closeDashboard(); });
+        closeDashEl.addEventListener('click', closeDashboard);
+    }
+
+    // --- NAVIGATION MOBILE (SWIPE) ---
+    if (wrapper) {
+        wrapper.addEventListener('scroll', () => {
+            // On ne met à jour via le scroll que sur mobile
+            if (window.innerWidth <= 768) updateDots();
+        });
+    }
+
+    // --- GESTION DES CLICS SUR LES POINTS (HYBRIDE) ---
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                // Sur mobile, on scroll vers la page
+                wrapper.scrollTo({ left: index * wrapper.offsetWidth, behavior: 'smooth' });
+            }
+            // Sur bureau, on laisse les flèches gérer la boucle infinie pour éviter de casser le DOM
+        });
+    });
+
+    // --- FERMETURE ET AUTRES ACTIONS ---
     document.getElementById('dashboard-modal')?.addEventListener('click', (e) => {
         if (e.target === document.getElementById('dashboard-modal')) closeDashboard();
     });
 
-    // Il y a deux .logout-card-minimal dans le HTML (export + déconnexion) — on prend le dernier
     const logoutBtns = document.querySelectorAll('.logout-card-minimal');
-    logoutBtns[logoutBtns.length - 1]?.addEventListener('click', handleLogout);
+    if (logoutBtns.length > 0) {
+        tapWithScale(logoutBtns[logoutBtns.length - 1], handleLogout);
+    }
 
-    document.getElementById('export-json-btn')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (!allMemoriesData?.length) return;
-        // Exclut canBeRelocated de l'export : c'est un flag de session calculé à la volée,
-        // pas une donnée BeReal. Le persister ferait réapparaître le bouton Replacer
-        // sur des BeReals déjà repositionnés lors d'un réimport.
-        const exportData = allMemoriesData.map(({ canBeRelocated: _, _relocated: __, ...m }) => m);
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = Object.assign(document.createElement('a'), { href: url, download: 'memories.json' });
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-    });
+    const exportBtn = document.getElementById('export-json-btn');
+    if (exportBtn) {
+        tapWithScale(exportBtn, (e) => {
+            e.stopPropagation();
+            if (typeof allMemoriesData === 'undefined' || !allMemoriesData?.length) return;
+            const exportData = allMemoriesData.map(({ canBeRelocated: _, _relocated: __, ...m }) => m);
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = Object.assign(document.createElement('a'), { href: url, download: 'memories.json' });
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    }
+
+    // Initialisation au chargement
+    updateDots();
 }
 
 async function handleLogout(event) {
