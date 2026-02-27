@@ -496,3 +496,114 @@
 .stat-card:has(#stat-best-month-name) {
     overflow: hidden;
 }
+
+/* ── MOBILE — Réduction proportionnelle, disposition inchangée ── */
+@media (pointer: coarse) and (max-width: 480px) {
+
+    .dashboard-positioner {
+        width: 92%;
+    }
+
+    .dashboard-content {
+        padding: 20px;
+        border-radius: 28px;
+    }
+
+    .dashboard-blur-bg {
+        border-radius: 28px;
+    }
+
+    .dashboard-header {
+        margin-bottom: 20px;
+    }
+
+    .dashboard-title {
+        font-size: 20px;
+        letter-spacing: -1px;
+    }
+
+    .close-dash {
+        width: 30px;
+        height: 30px;
+    }
+
+    /* Cards stats */
+    .stat-card {
+        padding: 16px 10px;
+        min-height: 90px;
+        border-radius: 18px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+    }
+
+    .stat-label {
+        font-size: 8px;
+        letter-spacing: 0.8px;
+        margin-top: 5px;
+    }
+
+    /* Streak cards */
+    .streak-card {
+        height: 80px;
+        padding: 0 18px;
+        border-radius: 20px;
+    }
+
+    .streak-value {
+        font-size: 32px;
+    }
+
+    .streak-label {
+        font-size: 8px;
+    }
+
+    .streak-icon {
+        font-size: 30px;
+    }
+
+    /* Grid gap */
+    .stats-grid {
+        gap: 10px;
+    }
+
+    /* Slider wrapper — compense le padding réduit */
+    #dash-cards-wrapper {
+        margin-left: -20px;
+        width: calc(100% + 40px);
+        padding: 10px 0;
+    }
+
+    .dash-page {
+        padding: 0 20px;
+    }
+
+    /* Flèches nav : rentrées à l'intérieur sur mobile (pas de place hors du card) */
+    .prev-dash {
+        left: -8px !important;
+        width: 36px;
+        height: 36px;
+    }
+
+    .next-dash {
+        right: -8px !important;
+        width: 36px;
+        height: 36px;
+    }
+
+    /* Boutons logout/export */
+    .logout-wrapper {
+        padding: 10px 0px;
+        gap: 8px;
+    }
+
+    .logout-card-minimal,
+    #export-json-btn {
+        padding: 6px 14px;
+    }
+
+    .logout-label-minimal {
+        font-size: 9px;
+    }
+}
