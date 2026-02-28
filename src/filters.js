@@ -144,13 +144,11 @@ function openFiltersModal() {
             const modalH      = modal.offsetHeight || 360;
             const gap         = 10;
 
-            // Aligné à droite avec le bouton, pile au-dessus
             let left = btnRect.right - modalW;
             let top  = btnRect.top - modalH - gap;
 
-            // Safe area : ne sort pas de l'écran
             left = Math.max(8, Math.min(left, window.innerWidth  - modalW - 8));
-            top  = Math.max(8, top); // on ne clamp pas en bas pour rester au-dessus du bouton
+            top  = Math.max(8, top);
 
             modal.style.bottom = 'auto';
             modal.style.right  = 'auto';
@@ -177,18 +175,27 @@ export function closeFilters() {
 function toggleCollapse() {
     isCollapsed = !isCollapsed;
     const modal = document.getElementById('filters-modal');
-    modal?.classList.toggle('filters-modal--collapsed', isCollapsed);
 
-    if (!isCollapsed) {
-        // Attend la fin de la transition CSS avant de mesurer les vraies dimensions
+    // Met à jour le titre AVANT la transition pour éviter le flash "..." → emoji
+    updateCollapsedTitle();
+
+    if (isCollapsed) {
+        // Fermeture : rapide
+        modal?.classList.remove('filters-modal--expanding');
+        modal?.classList.add('filters-modal--collapsed');
+    } else {
+        // Dépliage : lent et doux
+        modal?.classList.add('filters-modal--expanding');
+        modal?.classList.remove('filters-modal--collapsed');
+        // Attend la fin pour snapIntoViewport et retire la classe expanding
         modal.addEventListener('transitionend', function onEnd(e) {
-            if (e.propertyName !== 'opacity' && e.propertyName !== 'transform') return;
+            if (e.propertyName !== 'max-height') return;
             modal.removeEventListener('transitionend', onEnd);
+            modal.classList.remove('filters-modal--expanding');
             snapIntoViewport(modal);
         });
         updateResultCount();
     }
-    updateCollapsedTitle();
 }
 
 // Remet le modal entièrement dans l'écran après dépliage
@@ -216,20 +223,102 @@ function snapIntoViewport(modal) {
 function updateCollapsedTitle() {
     const titleEl = document.querySelector('#filters-modal .filters-title');
     if (!titleEl) return;
-    titleEl.textContent = (isCollapsed && hasActiveFilters())
+    const newText = (isCollapsed && hasActiveFilters())
         ? buildFilterSummary()
         : 'Filtres';
+    if (titleEl.textContent === newText) return;
+
+    if (isCollapsed) {
+        // Repliage : fade out → change → fade in (texte plus court arrive petit)
+        titleEl.style.opacity = '0';
+        setTimeout(() => {
+            titleEl.textContent = newText;
+            titleEl.style.opacity = '';
+        }, 150);
+    } else {
+        // Dépliage : change texte immédiatement (on est déjà invisible), puis fade in
+        titleEl.style.opacity = '0';
+        titleEl.textContent = newText;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => { titleEl.style.opacity = ''; });
+        });
+    }
+}
+
+// Canvas pour mesurer la largeur du texte sans toucher au DOM
+const _ctx = document.createElement('canvas').getContext('2d');
+function _measure(text, font) {
+    _ctx.font = font;
+    return _ctx.measureText(text).width;
 }
 
 function buildFilterSummary() {
     const f = getActiveFilters();
-    const parts = [];
-    if (f.years.length)        parts.push(f.years.join(', '));
-    if (f.months.length)       parts.push(f.months.map(i => MONTH_LABELS[i]).join(', '));
-    if (f.onTime === 'ontime') parts.push('BeReal');
-    if (f.onTime === 'late')   parts.push('BeLate');
-    if (f.onTime === 'bonus')  parts.push('BeBonus');
-    return parts.length ? parts.join(' · ') : 'Filtres';
+
+    // Largeur réelle disponible pour le titre
+    const handleEl = document.querySelector('#filters-modal .filters-drag-handle');
+    const rightEl  = document.querySelector('#filters-modal .filters-header-right');
+    const availW   = handleEl && rightEl
+        ? handleEl.offsetWidth - rightEl.offsetWidth - 36
+        : 160;
+
+    const font = '500 12px Inter';
+    const fits = (t) => _measure(t, font) <= availW;
+    const sep  = ' · ';
+
+    const LABELS = { ontime: 'BeReal', late: 'BeLate', bonus: 'BeBonus' };
+    const EMOJIS = { ontime: '⏱️',    late: '🐌',      bonus: '🎁'     };
+    const MONTH_SHORT = ['J','F','M','Av','Ma','Jn','Jl','Ao','S','O','N','D'];
+
+    const years     = f.years.slice();
+    const monthIdxs = f.months.slice();
+    const timing    = f.onTime !== 'all' ? f.onTime : null;
+
+    // Toutes les variantes de chaque segment, du plus lisible au plus compact
+    const Y  = years.length     ? years.join(', ')                              : null;
+    const Ys = years.length     ? years.map(y => "'" + y.slice(2)).join(', ')   : null;
+    const M  = monthIdxs.length ? monthIdxs.map(i => MONTH_LABELS[i]).join(', '): null;
+    const Ms = monthIdxs.length ? monthIdxs.map(i => MONTH_SHORT[i]).join(',')  : null;
+    const T  = timing           ? LABELS[timing]                                : null;
+    const Te = timing           ? EMOJIS[timing]                                : null;
+
+    const candidates = [];
+    const add = (...parts) => candidates.push(parts.filter(Boolean).join(sep));
+
+    if (years.length && monthIdxs.length && timing) {
+        // Tout présent : essaie toutes les combinaisons abrégées, jamais de drop
+        add(Y,  M,  T);
+        add(Y,  M,  Te);
+        add(Y,  Ms, Te);
+        add(Ys, M,  Te);
+        add(Ys, Ms, Te);
+        // Rien ne passe → '…' (pas de drop de segment)
+    } else if (years.length && timing) {
+        add(Y,  T);
+        add(Y,  Te);
+        add(Ys, T);
+        add(Ys, Te);
+    } else if (monthIdxs.length && timing) {
+        add(M,  T);
+        add(M,  Te);
+        add(Ms, Te);
+    } else if (years.length && monthIdxs.length) {
+        add(Y,  M);
+        add(Y,  Ms);
+        add(Ys, M);
+        add(Ys, Ms);
+    } else if (timing) {
+        add(T); add(Te);
+    } else if (years.length) {
+        add(Y); add(Ys);
+    } else if (monthIdxs.length) {
+        add(M); add(Ms);
+    }
+
+    for (const c of candidates) {
+        if (c && fits(c)) return c;
+    }
+    return '…';
 }
 
 // --- RENDER BOUTONS ---
