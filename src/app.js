@@ -5,7 +5,7 @@
 import { saveFileToSession, loadSessionFiles, checkDifferencesAndShowExport } from './db.js';
 import { fileMap, setFileMap, allMemoriesData, setAllMemoriesData, isRelocating, memoryToUpdate, setIsRelocating } from './state.js';
 import { map, setup3DBuildings, setupMapLayers, refreshMapMarkers, watchZoomRadius, showRelocationHighlight, clearRelocationHighlight } from './map.js';
-import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDash } from './dashboard.js';
+import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDash, navigateDash } from './dashboard.js';
 import { initBadge } from './badge.js';
 import { syncPWAHeight, setMapRef, getLocalUrl } from './utils.js';
 import { convertMemoriesToGeoJSON } from './geo-convert.js';
@@ -218,8 +218,8 @@ document.addEventListener('keydown', (e) => {
 
     const dash = document.getElementById('dashboard-modal');
     if (dash?.style.display === 'flex') {
-        if (e.key === 'ArrowRight') switchDash('right');
-        if (e.key === 'ArrowLeft')  switchDash('left');
+        if (e.key === 'ArrowRight') navigateDash('right');
+        if (e.key === 'ArrowLeft')  navigateDash('left');
         if (e.key === 'Escape')     closeDashboard();
     }
 });

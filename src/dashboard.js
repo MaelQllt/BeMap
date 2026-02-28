@@ -12,6 +12,23 @@ export { setCachedStats } from './state.js';
 // Verrou anti-spam pendant l'animation du slider
 let isAnimatingDash = false;
 
+// Met à jour les points ET fait glisser — point d'entrée unique pour la navigation
+export function navigateDash(direction = 'right') {
+    const slider = document.getElementById('dash-slider');
+    const dots   = document.querySelectorAll('.dot');
+    if (!slider?.firstElementChild || !dots.length) return;
+
+    const currentPageId = slider.firstElementChild.id;
+    const currentIdx    = parseInt(currentPageId.replace('dash-page-', '')) - 1;
+
+    const nextIdx = direction === 'right'
+        ? (currentIdx >= 2 ? 0 : currentIdx + 1)
+        : (currentIdx <= 0 ? 2 : currentIdx - 1);
+
+    dots.forEach((dot, idx) => dot.classList.toggle('active', idx === nextIdx));
+    switchDash(direction);
+}
+
 // Fait glisser le slider vers la page suivante ou précédente
 export function switchDash(direction = 'right') {
     if (window.innerWidth <= 768) return;
@@ -22,28 +39,25 @@ export function switchDash(direction = 'right') {
     const slider = document.getElementById('dash-slider');
     const DURATION = 400;
 
-    slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
-
     if (direction === 'right') {
-        // Avec 3 pages en 300% de large, chaque page occupe 33.333%
+        slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
         slider.style.transform = 'translateX(-33.333%)';
         setTimeout(() => {
             slider.style.transition = 'none';
             slider.appendChild(slider.firstElementChild);
             slider.style.transform = 'translateX(0%)';
+            isAnimatingDash = false;
         }, DURATION);
     } else {
         slider.style.transition = 'none';
         slider.prepend(slider.lastElementChild);
         slider.style.transform = 'translateX(-33.333%)';
-        // rAF au lieu de offsetHeight pour forcer le reflow sans bloquer le thread principal
-        requestAnimationFrame(() => {
+        requestAnimationFrame(() => requestAnimationFrame(() => {
             slider.style.transition = `transform ${DURATION}ms cubic-bezier(0.25, 0.46, 0.45, 0.94)`;
             slider.style.transform = 'translateX(0%)';
-        });
+            setTimeout(() => { isAnimatingDash = false; }, DURATION);
+        }));
     }
-
-    setTimeout(() => { isAnimatingDash = false; }, DURATION);
 }
 
 // Calcule toutes les statistiques depuis les données brutes.
@@ -195,7 +209,7 @@ export async function calculateStats(data, userData, friendsData) {
             daysOld,
             joinDate: joinDateStr,
             bestMonthName,
-            bestMonthLabel: `MOIS RECORD\n(${maxPhotos} BEREALS)`,
+            bestMonthLabel: `MOIS RECORD (${maxPhotos} BEREALS)`,
             avgTime:          avgTimeStr,
             monthlyChartData: monthlyChartData
         });
@@ -403,12 +417,23 @@ export function updateDashboardUI() {
         'stat-age':             cachedStats.daysOld,
         'stat-join-date':       cachedStats.joinDate,
         'stat-best-month-name': cachedStats.bestMonthName,
-        'stat-best-month-label':cachedStats.bestMonthLabel,
+        // stat-best-month-label géré séparément
         'stat-avg-time':        cachedStats.avgTime.toUpperCase(),
     };
     for (const [id, value] of Object.entries(mapping)) {
         const el = document.getElementById(id);
         if (el) el.innerText = value;
+    }
+
+    // Label mois record : deux spans pour contrôler la mise en ligne desktop/mobile
+    const labelEl = document.getElementById('stat-best-month-label');
+    if (labelEl && cachedStats.bestMonthLabel) {
+        const parts = cachedStats.bestMonthLabel.match(/^(MOIS RECORD)\s*(\(.*\))$/);
+        if (parts) {
+            labelEl.innerHTML = `<span class="bm-line1">${parts[1]}</span><span class="bm-line2">${parts[2]}</span>`;
+        } else {
+            labelEl.innerText = cachedStats.bestMonthLabel;
+        }
     }
 
     // Ajuste la taille de police du mois record pour qu'il rentre dans la card
@@ -511,27 +536,8 @@ export function initDashboard() {
     };
 
     // --- NAVIGATION BUREAU (FLÈCHES) ---
-    document.querySelector('.prev-dash')?.addEventListener('click', () => {
-        if (!slider.firstElementChild) return;
-        // On calcule l'index précédent AVANT le mouvement pour éviter le lag
-        const currentPageId = slider.firstElementChild.id;
-        let prevIdx = parseInt(currentPageId.replace('dash-page-', '')) - 2;
-        if (prevIdx < 0) prevIdx = 2; // Boucle de la page 1 vers la 3
-        
-        updateDots(prevIdx);
-        switchDash('left');
-    });
-
-    document.querySelector('.next-dash')?.addEventListener('click', () => {
-        if (!slider.firstElementChild) return;
-        // On calcule l'index suivant AVANT le mouvement
-        const currentPageId = slider.firstElementChild.id;
-        let nextIdx = parseInt(currentPageId.replace('dash-page-', ''));
-        if (nextIdx > 2) nextIdx = 0; // Boucle de la page 3 vers la 1
-        
-        updateDots(nextIdx);
-        switchDash('right');
-    });
+    document.querySelector('.prev-dash')?.addEventListener('click', (e) => { navigateDash('left');  e.currentTarget.blur(); });
+    document.querySelector('.next-dash')?.addEventListener('click', (e) => { navigateDash('right'); e.currentTarget.blur(); });
 
     // Helper : feedback discret au tap, sans laisser d'état actif résiduel Safari
     const tapWithScale = (el, fn) => {

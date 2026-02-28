@@ -373,10 +373,10 @@
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
-    background: rgba(255, 255, 255, 0.15); /* Même fond que les flèches photo */
+    background: rgba(255, 255, 255, 0.15);
     border: none;
     color: white;
-    width: 45px; /* Taille légèrement réduite pour le dashboard */
+    width: 45px;
     height: 45px;
     border-radius: 50%;
     cursor: pointer;
@@ -385,12 +385,16 @@
     justify-content: center;
     backdrop-filter: blur(15px);
     -webkit-backdrop-filter: blur(15px);
-    opacity: 1; /* On garde l'opacité pleine */
+    opacity: 1;
     transition: all 0.3s ease;
-    font-size: 20px; /* Pour le symbole */
+    font-size: 20px;
     pointer-events: auto;
     z-index: 10001 !important;
     visibility: visible !important;
+    outline: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .dash-nav:hover {
@@ -496,6 +500,11 @@
 .stat-card:has(#stat-best-month-name) {
     overflow: hidden;
 }
+
+/* Label mois record — desktop : une ligne avec espace, mobile : deux lignes */
+#stat-best-month-label { text-align: center; white-space: nowrap; }
+#stat-best-month-label .bm-line1 { display: inline; }
+#stat-best-month-label .bm-line2 { display: inline; margin-left: 4px; }
 
 
 /* --- ADAPTATION MOBILE --- */
@@ -607,10 +616,10 @@
 
 /* --- PAGINATION --- */
 .dash-pagination {
-    display: flex !important; /* Force l'affichage */
+    display: flex !important;
     justify-content: center;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
     margin: 20px 0;
     width: 100%;
     position: relative;
@@ -618,15 +627,19 @@
 }
 
 .dot {
-    width: 7px;
-    height: 7px;
-    background: rgba(255, 255, 255, 0.2);
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    transition: background 0.3s ease;
+    background: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.3s ease, width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dot.active {
-    background: #ffffff !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    width: 16px;
+    border-radius: 3px;
 }
 
 /* --- STRUCTURE MOBILE --- */
@@ -679,11 +692,10 @@
         -webkit-tap-highlight-color: transparent !important;
     }
 
-    /* Best month label : retour à la ligne avant le compteur */
-    #stat-best-month-label {
-        text-align: center;
-        white-space: pre-line;
-    }
+    /* Best month label : deux lignes sur mobile */
+    #stat-best-month-label { text-align: center; white-space: normal; }
+    #stat-best-month-label .bm-line1 { display: block; }
+    #stat-best-month-label .bm-line2 { display: block; margin-left: 0; }
 
     /* Flèches de navigation : masquées sur mobile (swipe suffit) */
     .dash-nav {
