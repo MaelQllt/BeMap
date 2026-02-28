@@ -130,19 +130,21 @@
 }
 
 /* Visible quand la souris est proche (.nearby) ou au hover direct */
-.bottom-ctrl-btn:hover,
-.bottom-ctrl-btn.nearby {
-    opacity: 1;
-    transform: scale(1.1);
+/* Hover + nearby : desktop uniquement */
+@media (pointer: fine) {
+    .bottom-ctrl-btn:hover,
+    .bottom-ctrl-btn.nearby {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+    .bottom-ctrl-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.25);
+        color: #fff;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    }
+    .bottom-ctrl-btn:active { transform: scale(0.95); }
 }
-
-.bottom-ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #fff;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-}
-.bottom-ctrl-btn:active { transform: scale(0.95); }
 
 /* ── État frozen (modale ouverte) — même logique que .map-controls ── */
 .bottom-controls.frozen {
@@ -504,3 +506,63 @@
 #filters-close-btn:hover::before, #filters-close-btn:hover::after { opacity: 0.9; }
 #timeline-close-btn:hover { background: rgba(255,255,255,0.15); }
 #timeline-close-btn:hover::before, #timeline-close-btn:hover::after { opacity: 0.9; }
+
+/* ============================================================
+   5. MOBILE (pointer: coarse) — deux états : discret | actif
+   ============================================================ */
+
+@media (pointer: coarse) {
+
+    /* Bouton info (attribution) — masqué sur mobile */
+    .attrib-wrapper {
+        display: none;
+    }
+
+    /* Filtres + Timeline — plus grands */
+    .bottom-ctrl-btn {
+        width: 136px;
+        height: 44px;
+        font-size: 12px;
+        gap: 8px;
+    }
+
+    .bottom-ctrl-btn svg {
+        width: 15px;
+        height: 15px;
+    }
+
+    /* Pas de hover sur mobile — on écrase tout */
+    .bottom-ctrl-btn:hover,
+    .bottom-ctrl-btn.nearby {
+        opacity: 0.25;
+        transform: none;
+        background: rgba(12, 12, 14, 0.75);
+        border-color: rgba(255, 255, 255, 0.13);
+        color: rgba(255, 255, 255, 0.65);
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Tap = apparence hover desktop */
+    .bottom-ctrl-btn:active {
+        opacity: 1 !important;
+        transform: scale(1.1) !important;
+        background: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        color: #fff !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
+    }
+
+    /* État actif (ouvert) — hover neutralisé, reste allumé */
+    .bottom-ctrl-btn.filter-btn--active,
+    .bottom-ctrl-btn.timeline-btn--active {
+        opacity: 1 !important;
+    }
+
+    .bottom-ctrl-btn.filter-btn--active:hover,
+    .bottom-ctrl-btn.timeline-btn--active:hover {
+        opacity: 1 !important;
+        background: rgba(255, 255, 255, 0.14) !important;
+        border-color: rgba(255, 255, 255, 0.4) !important;
+        transform: none !important;
+    }
+}
