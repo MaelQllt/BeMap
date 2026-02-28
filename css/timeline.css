@@ -130,21 +130,19 @@
 }
 
 /* Visible quand la souris est proche (.nearby) ou au hover direct */
-/* Hover + nearby : desktop uniquement */
-@media (pointer: fine) {
-    .bottom-ctrl-btn:hover,
-    .bottom-ctrl-btn.nearby {
-        opacity: 1;
-        transform: scale(1.1);
-    }
-    .bottom-ctrl-btn:hover {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.25);
-        color: #fff;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
-    }
-    .bottom-ctrl-btn:active { transform: scale(0.95); }
+.bottom-ctrl-btn:hover,
+.bottom-ctrl-btn.nearby {
+    opacity: 1;
+    transform: scale(1.1);
 }
+
+.bottom-ctrl-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.bottom-ctrl-btn:active { transform: scale(0.95); }
 
 /* ── État frozen (modale ouverte) — même logique que .map-controls ── */
 .bottom-controls.frozen {
@@ -513,10 +511,13 @@
 
 @media (pointer: coarse) {
 
-    /* Bouton info (attribution) — masqué sur mobile */
-    .attrib-wrapper {
-        display: none;
+    /* Position de base des boutons — mobile seulement */
+    .bottom-controls {
+        bottom: calc(30px + env(safe-area-inset-bottom));
     }
+
+    /* Bouton info — masqué */
+    .attrib-wrapper { display: none; }
 
     /* Filtres + Timeline — plus grands */
     .bottom-ctrl-btn {
@@ -525,13 +526,12 @@
         font-size: 12px;
         gap: 8px;
     }
-
     .bottom-ctrl-btn svg {
         width: 15px;
         height: 15px;
     }
 
-    /* Pas de hover sur mobile — on écrase tout */
+    /* Zéro hover sur mobile — discret par défaut */
     .bottom-ctrl-btn:hover,
     .bottom-ctrl-btn.nearby {
         opacity: 0.25;
@@ -552,17 +552,70 @@
         box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55) !important;
     }
 
-    /* État actif (ouvert) — hover neutralisé, reste allumé */
+    /* État actif = nearby desktop + texte/icône blancs */
     .bottom-ctrl-btn.filter-btn--active,
     .bottom-ctrl-btn.timeline-btn--active {
         opacity: 1 !important;
+        transform: scale(1.1) !important;
+        color: #fff !important;
+        background: rgba(12, 12, 14, 0.75) !important;
+        border-color: rgba(255, 255, 255, 0.13) !important;
+        box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45) !important;
     }
-
+    .bottom-ctrl-btn.filter-btn--active svg,
+    .bottom-ctrl-btn.timeline-btn--active svg { opacity: 1 !important; }
     .bottom-ctrl-btn.filter-btn--active:hover,
     .bottom-ctrl-btn.timeline-btn--active:hover {
         opacity: 1 !important;
-        background: rgba(255, 255, 255, 0.14) !important;
-        border-color: rgba(255, 255, 255, 0.4) !important;
-        transform: none !important;
+        transform: scale(1.1) !important;
+        color: #fff !important;
+        background: rgba(12, 12, 14, 0.75) !important;
+        border-color: rgba(255, 255, 255, 0.13) !important;
     }
+
+    /* Spacer push */
+    #timeline-spacer {
+        width: 1px;
+        height: 0;
+        overflow: hidden;
+        transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #timeline-spacer.timeline-spacer--open { height: 70px; }
+
+    /* ── Contrôles timeline ── */
+    .timeline-ctrl-pill {
+        height: 44px;
+        padding: 0 16px;
+        font-size: 13px;
+        border-radius: 22px;
+    }
+
+    #timeline-play-btn,
+    #timeline-close-btn {
+        width: 44px;
+        height: 44px;
+    }
+    #timeline-play-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    #timeline-slider { height: 4px; }
+    #timeline-slider::-webkit-slider-thumb { width: 24px; height: 24px; }
+    #timeline-slider::-moz-range-thumb { width: 24px; height: 24px; }
+
+    /* Date 2 lignes — même style pour les deux */
+    .timeline-date {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+    }
+    .tl-line {
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 1.2;
+        color: #fff;
+        text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+    }
+    .timeline-count { font-size: 11px; }
 }

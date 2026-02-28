@@ -18,9 +18,22 @@ let _wasPlayingBeforeSuspend = false; // état lecture avant suspension par moda
 
 // --- INIT ---
 export function initTimeline() {
+    // Spacer mobile : pousse les boutons vers le haut quand la timeline est ouverte
+    const bottomControls = document.querySelector('.bottom-controls');
+    if (bottomControls && !document.getElementById('timeline-spacer')) {
+        const spacer = document.createElement('div');
+        spacer.id = 'timeline-spacer';
+        bottomControls.appendChild(spacer);
+    }
+
     document.getElementById('timeline-toggle-btn')?.addEventListener('click', toggleTimeline);
     document.getElementById('timeline-slider')?.addEventListener('input', onSliderInput);
-    document.getElementById('timeline-play-btn')?.addEventListener('click', togglePlay);
+    const playBtn = document.getElementById('timeline-play-btn');
+    playBtn?.addEventListener('click', togglePlay);
+    playBtn?.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        togglePlay();
+    }, { passive: false });
     document.getElementById('timeline-close-btn')?.addEventListener('click', closeTimeline);
     document.getElementById('timeline-speed-btn')?.addEventListener('click', cycleSpeed);
     document.getElementById('timeline-mode-btn')?.addEventListener('click', toggleMode);
@@ -47,6 +60,7 @@ export function openTimeline() {
 
     document.getElementById('timeline-panel')?.classList.add('timeline-panel--visible');
     document.getElementById('timeline-toggle-btn')?.classList.add('timeline-btn--active');
+    document.getElementById('timeline-spacer')?.classList.add('timeline-spacer--open');
 
     const slider = document.getElementById('timeline-slider');
     if (slider) {
@@ -65,6 +79,7 @@ export function closeTimeline() {
     _wasPlayingBeforeSuspend = false;
     document.getElementById('timeline-panel')?.classList.remove('timeline-panel--visible');
     document.getElementById('timeline-toggle-btn')?.classList.remove('timeline-btn--active');
+    document.getElementById('timeline-spacer')?.classList.remove('timeline-spacer--open');
     applyFiltersToMap();
 }
 
@@ -156,7 +171,26 @@ function updateTimelineLabel(index, count) {
             }).length;
     }
 
-    label.innerHTML = `<span class="timeline-date">${formatted}</span><span class="timeline-count">${count} BeReal${count > 1 ? 's' : ''}</span>`;
+    const isMobile = window.matchMedia('(pointer: coarse)').matches;
+    let dateHtml;
+    if (isMobile) {
+        const key2 = sortedDates[index];
+        let line1, line2;
+        if (viewMode === 'month') {
+            const d2 = new Date(key2 + '-01T12:00:00');
+            const month = d2.toLocaleDateString('fr-FR', { month: 'long' });
+            line1 = month.charAt(0).toUpperCase() + month.slice(1);
+            line2 = d2.getFullYear().toString();
+        } else {
+            const d2 = new Date(key2 + 'T12:00:00');
+            line1 = `${d2.getDate()} ${d2.toLocaleDateString('fr-FR', { month: 'long' })}`;
+            line2 = d2.getFullYear().toString();
+        }
+        dateHtml = `<span class="timeline-date"><span class="tl-line">${line1}</span><span class="tl-line">${line2}</span></span>`;
+    } else {
+        dateHtml = `<span class="timeline-date">${formatted}</span>`;
+    }
+    label.innerHTML = `${dateHtml}<span class="timeline-count">${count} BeReal${count > 1 ? 's' : ''}</span>`;
 }
 
 // --- PROGRESS SLIDER ---

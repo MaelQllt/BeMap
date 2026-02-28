@@ -386,9 +386,12 @@ document.addEventListener('mousemove', (e) => {
         const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
         terrainBtn.classList.toggle('nearby', dist < PROXIMITY_PX);
     }
-    document.querySelectorAll('.bottom-ctrl-btn').forEach(btn => {
-        const r = btn.getBoundingClientRect();
-        const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
-        btn.classList.toggle('nearby', dist < PROXIMITY_PX);
-    });
+    // .nearby sur bottom-ctrl-btn : desktop uniquement
+    if (window.matchMedia('(pointer: fine)').matches) {
+        document.querySelectorAll('.bottom-ctrl-btn').forEach(btn => {
+            const r = btn.getBoundingClientRect();
+            const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+            btn.classList.toggle('nearby', dist < PROXIMITY_PX);
+        });
+    }
 });
