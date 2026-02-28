@@ -84,14 +84,15 @@ export function initBadge() {
 
         // Tap = aucun mouvement → ouvre le dashboard
         if (!hasMovedBadge) {
+            e.preventDefault(); // bloque la synthèse du click pour éviter le double-fire
             openDashboard();
         }
 
         onDragEnd();
     });
 
-    // ─── CLIC SOURIS (fallback desktop) ───────────────────────────
-    // Sur mobile ce listener ne se déclenche pas si touchend a déjà ouvert le dashboard
+    // ─── CLIC SOURIS (desktop uniquement) ─────────────────────────
+    // Sur mobile, touchend appelle e.preventDefault() donc ce listener ne se déclenche pas.
     badge.addEventListener('click', () => {
         if (!hasMovedBadge) openDashboard();
     });

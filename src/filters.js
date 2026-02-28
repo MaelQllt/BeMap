@@ -11,12 +11,14 @@ import { applyFiltersToMap, openTimeline, getIsTimelineOpen }     from './timeli
 
 const MONTH_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-let isFiltersOpen  = false;
-let isCollapsed    = false;
-let isDragging     = false;
-let dragOffsetX    = 0;
-let dragOffsetY    = 0;
-let hasBeenDragged = false;
+let isFiltersOpen       = false;
+let isCollapsed         = false;
+let wasCollapsedOnClose = true; // true par défaut : premier appel toujours depuis état fermé
+let isDragging          = false;
+let dragOffsetX         = 0;
+let dragOffsetY         = 0;
+let hasBeenDragged      = false;
+let filtersUIBuilt      = false; // évite de reconstruire les chips si les données n'ont pas changé
 
 // --- INIT ---
 export function initFilters() {
@@ -101,8 +103,15 @@ function initDrag() {
 }
 
 // --- BUILD UI ---
-export function buildFiltersUI() {
+export function buildFiltersUI(force = false) {
     if (!allMemoriesData.length) return;
+    if (filtersUIBuilt && !force) {
+        // Données inchangées — on re-render uniquement les boutons onTime
+        // (les années/mois ne changent pas, mais l'état actif peut avoir changé)
+        renderOnTimeButtons();
+        updateFilterBadge();
+        return;
+    }
     const years = [...new Set(
         allMemoriesData.filter(m => m.takenTime)
             .map(m => new Date(m.takenTime).getFullYear().toString())
@@ -111,7 +120,11 @@ export function buildFiltersUI() {
     renderMonthButtons();
     renderOnTimeButtons();
     updateFilterBadge();
+    filtersUIBuilt = true;
 }
+
+// Invalide le cache UI (à appeler si allMemoriesData change, ex: après relocation)
+export function invalidateFiltersUI() { filtersUIBuilt = false; }
 
 // --- TOGGLE PANEL ---
 function toggleFilters() {
@@ -129,37 +142,75 @@ function openFiltersModal() {
     const toggler = document.getElementById('filters-toggle-btn');
     if (!modal || !toggler) return;
 
-    modal.classList.remove('filters-modal--collapsed');
-    updateCollapsedTitle(); // S'assure que le titre est "Filtres" à la réouverture
+    updateCollapsedTitle();
 
-    // Position : au-dessus du bouton, sauf si l'user l'a déjà déplacé
-    if (!hasBeenDragged) {
-        // Calcule après un frame pour avoir les bonnes dimensions
-        modal.style.visibility = 'hidden';
-        modal.classList.add('filters-modal--visible');
+    // APPROCHE : on déplie SANS transition d'abord (pour mesurer la vraie hauteur),
+    // on positionne, puis on réactive la transition pour l'animation d'apparition.
+    // Ça évite toute la complexité de transitionend/setTimeout.
 
-        requestAnimationFrame(() => {
-            const btnRect     = toggler.getBoundingClientRect();
-            const modalW      = modal.offsetWidth  || 300;
-            const modalH      = modal.offsetHeight || 360;
-            const gap         = 10;
-
-            let left = btnRect.right - modalW;
-            let top  = btnRect.top - modalH - gap;
-
-            left = Math.max(8, Math.min(left, window.innerWidth  - modalW - 8));
-            top  = Math.max(8, top);
-
-            modal.style.bottom = 'auto';
-            modal.style.right  = 'auto';
-            modal.style.left   = left + 'px';
-            modal.style.top    = top  + 'px';
-            modal.style.transformOrigin = 'bottom right';
-            modal.style.visibility = '';
-        });
-    } else {
-        modal.classList.add('filters-modal--visible');
+    // 1. Coupe toutes les transitions sur le modal ET son body
+    const body = modal.querySelector('.filters-body');
+    modal.style.transition = 'none';
+    modal.style.opacity    = '0';
+    if (body) {
+        body.style.transition = 'none';
+        // Force max-height en inline pour bypasser la règle CSS de collapsed
+        body.style.maxHeight  = '600px';
+        body.style.opacity    = '1';
+        body.style.padding    = '';
     }
+
+    // 2. Déplie immédiatement (sans animation)
+    modal.classList.remove('filters-modal--collapsed');
+    modal.classList.remove('filters-modal--expanding');
+    modal.classList.add('filters-modal--visible');
+
+    // 3. Force reflow — maintenant les dimensions sont celles dépliées
+    void modal.offsetHeight;
+
+    const modalW = modal.offsetWidth  || 300;
+    const modalH = modal.offsetHeight || 360;
+
+
+    // 4. Calcule la position
+    // Si jamais dragué → position par défaut au-dessus du bouton
+    // Si dragué ou position mémorisée → repart de style.left/top (set par closeFilters)
+    let left, top;
+    const savedLeft = parseFloat(modal.style.left);
+    const savedTop  = parseFloat(modal.style.top);
+    const hasSavedPos = !isNaN(savedLeft) && !isNaN(savedTop);
+
+    if (!hasBeenDragged || !hasSavedPos) {
+        const btnRect = toggler.getBoundingClientRect();
+        const gap     = 10;
+        left = btnRect.right - modalW;
+        top  = btnRect.top   - modalH - gap;
+    } else {
+        left = savedLeft;
+        top  = savedTop;
+    }
+
+    // 5. Snap dans l'écran — dépliage vers le haut si proche du bas
+    left = Math.max(8, Math.min(left, window.innerWidth  - modalW - 8));
+    top  = Math.max(8, Math.min(top,  window.innerHeight - modalH - 8));
+
+
+    modal.style.bottom          = 'auto';
+    modal.style.right           = 'auto';
+    modal.style.left            = left + 'px';
+    modal.style.top             = top  + 'px';
+    modal.style.transformOrigin = 'bottom right';
+
+    // 6. Réactive les transitions et révèle le modal
+    requestAnimationFrame(() => {
+        modal.style.transition = '';
+        modal.style.opacity    = '';
+        if (body) {
+            body.style.transition = '';
+            body.style.maxHeight  = '';
+            body.style.opacity    = '';
+        }
+    });
 
     toggler.classList.add('filter-btn--active');
 }
@@ -167,8 +218,24 @@ function openFiltersModal() {
 export function closeFilters() {
     if (!isFiltersOpen) return;
     isFiltersOpen = false;
-    document.getElementById('filters-modal')?.classList.remove('filters-modal--visible');
-    updateFilterBadge(); // badge reste si filtres actifs, disparaît sinon
+    const modal = document.getElementById('filters-modal');
+
+    wasCollapsedOnClose = isCollapsed;
+
+    // Mémorise la position AVANT de cacher (getBoundingClientRect valide tant que visible)
+    if (modal) {
+        const rect = modal.getBoundingClientRect();
+        // Mémorise toujours left/top en absolu depuis le coin haut-gauche visible
+        // On force aussi bottom/right à auto pour éviter les conflits CSS
+        modal.style.left   = rect.left + 'px';
+        modal.style.top    = rect.top  + 'px';
+        modal.style.bottom = 'auto';
+        modal.style.right  = 'auto';
+    }
+
+    modal?.classList.remove('filters-modal--visible');
+
+    updateFilterBadge();
 }
 
 // --- COLLAPSE / EXPAND ---
@@ -180,45 +247,75 @@ function toggleCollapse() {
     updateCollapsedTitle();
 
     if (isCollapsed) {
-        // Fermeture : rapide
+        // Repliage : rapide
         modal?.classList.remove('filters-modal--expanding');
         modal?.classList.add('filters-modal--collapsed');
     } else {
-        // Dépliage : lent et doux
-        modal?.classList.add('filters-modal--expanding');
-        modal?.classList.remove('filters-modal--collapsed');
-        // Attend la fin pour snapIntoViewport et retire la classe expanding
-        modal.addEventListener('transitionend', function onEnd(e) {
-            if (e.propertyName !== 'max-height') return;
-            modal.removeEventListener('transitionend', onEnd);
-            modal.classList.remove('filters-modal--expanding');
-            snapIntoViewport(modal);
+        // Dépliage : on calcule d'abord où le modal va atterrir AVANT d'animer,
+        // puis on repositionne si nécessaire, puis on lance l'animation.
+        // Ainsi l'user ne voit jamais le modal hors écran.
+
+        // 1. Mesure la hauteur dépliée sans animer (transition:none + max-height forcé)
+        const body = modal.querySelector('.filters-body');
+        if (body) {
+            body.style.transition = 'none';
+            body.style.maxHeight  = '600px';
+        }
+        modal.style.transition = 'none';
+        modal.classList.remove('filters-modal--collapsed');
+        void modal.offsetHeight; // force reflow
+
+        const modalW = modal.offsetWidth;
+        const modalH = modal.offsetHeight;
+        const rect   = modal.getBoundingClientRect();
+
+        // 2. Calcule la correction nécessaire
+        let left = rect.left;
+        let top  = rect.top;
+        const overRight  = rect.right  - window.innerWidth  + 8;
+        const overBottom = rect.bottom - window.innerHeight + 8;
+        const overLeft   = 8 - rect.left;
+        const overTop    = 8 - rect.top;
+        if (overRight  > 0) left -= overRight;
+        if (overBottom > 0) top  -= overBottom;
+        if (overLeft   > 0) left += overLeft;
+        if (overTop    > 0) top  += overTop;
+
+        // 3. Remet en état replié sans transition (point de départ de l'animation)
+        modal.classList.add('filters-modal--collapsed');
+        if (body) body.style.maxHeight = '';
+        void modal.offsetHeight; // force reflow
+
+        // 4. Lance simultanément le repositionnement ET le dépliage avec la même courbe.
+        // left/top transitionnent avec la même durée/easing que max-height → mouvement organique.
+        requestAnimationFrame(() => {
+            const ease = '1.1s cubic-bezier(0.33, 0, 0.1, 1)';
+            modal.style.transition = `left ${ease}, top ${ease}`;
+            if (body) body.style.transition = '';
+
+            // Applique la position cible — sera animée par la transition left/top
+            modal.style.left   = left + 'px';
+            modal.style.top    = top  + 'px';
+            modal.style.bottom = 'auto';
+            modal.style.right  = 'auto';
+
+            // Lance le dépliage — max-height s'anime en même temps que left/top
+            modal.classList.add('filters-modal--expanding');
+            modal.classList.remove('filters-modal--collapsed');
+
+            modal.addEventListener('transitionend', function onEnd(e) {
+                if (e.propertyName !== 'max-height') return;
+                modal.removeEventListener('transitionend', onEnd);
+                modal.classList.remove('filters-modal--expanding');
+                // Retire la transition inline sur left/top pour ne pas gêner les drags suivants
+                modal.style.transition = '';
+            });
         });
+
         updateResultCount();
     }
 }
 
-// Remet le modal entièrement dans l'écran après dépliage
-function snapIntoViewport(modal) {
-    if (!modal) return;
-    const rect = modal.getBoundingClientRect();
-    let left = parseFloat(modal.style.left) || rect.left;
-    let top  = parseFloat(modal.style.top)  || rect.top;
-
-    const overRight  = rect.right  - window.innerWidth  + 8;
-    const overBottom = rect.bottom - window.innerHeight + 8;
-
-    if (overRight  > 0) left -= overRight;
-    if (overBottom > 0) top  -= overBottom;
-    left = Math.max(8, left);
-    top  = Math.max(8, top);
-
-    modal.style.left = left + 'px';
-    modal.style.top  = top  + 'px';
-    modal.style.bottom = 'auto';
-    modal.style.right  = 'auto';
-    hasBeenDragged = true; // on garde la position calculée
-}
 
 function updateCollapsedTitle() {
     const titleEl = document.querySelector('#filters-modal .filters-title');

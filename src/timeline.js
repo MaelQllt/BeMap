@@ -4,7 +4,7 @@
 
 import { allMemoriesData }                        from './state.js';
 import { map, refreshMapMarkers, updateMapData }  from './map.js';
-import { convertMemoriesToGeoJSON }               from './app.js';
+import { convertMemoriesToGeoJSON }               from './geo-convert.js';
 import { getActiveFilters, applyFiltersToData }   from './filter-core.js';
 
 let isTimelineOpen       = false;

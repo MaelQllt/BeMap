@@ -258,8 +258,8 @@
 
 /* --- TOAST INLINE CARTE --- */
 .map-toast {
-    position: absolute;
-    bottom: 80px;
+    position: fixed;
+    bottom: calc(80px + env(safe-area-inset-bottom));
     left: 50%;
     transform: translateX(-50%) translateY(8px);
     background: rgba(20, 20, 22, 0.88);
@@ -377,5 +377,95 @@
         opacity: 0.5;
         transform: scale(0.85);
         transition: opacity 0.05s ease, transform 0.05s ease;
+    }
+}
+/* --- BANDEAU RELOCATION ---------------------------------------- */
+.relocation-banner {
+    position: absolute;
+    top: calc(16px + env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%) translateY(-12px);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(15, 15, 17, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    padding: 10px 10px 10px 16px;
+    white-space: nowrap;
+    pointer-events: auto;
+    z-index: 9998;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.relocation-banner--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.relocation-banner__text {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: 0.1px;
+}
+
+.relocation-banner__cancel {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 6px 14px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+
+.relocation-banner__cancel:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.relocation-banner__cancel:active {
+    transform: scale(0.95);
+}
+
+/* Desktop : hint clavier discret */
+@media (pointer: fine) {
+    .relocation-banner__text::after {
+        content: '· Échap pour annuler';
+        margin-left: 4px;
+        opacity: 0.35;
+        font-size: 11px;
+    }
+}
+
+/* Mobile : bandeau en bas, au-dessus de la zone safe area,
+   calé juste au-dessus des boutons bottom-controls */
+@media (pointer: coarse) {
+    .relocation-banner {
+        top: auto;
+        bottom: calc(150px + env(safe-area-inset-bottom));
+        transform: translateX(-50%) translateY(12px);
+    }
+    .relocation-banner--visible {
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@media (pointer: coarse) {
+    .map-toast {
+        bottom: calc(-10px + env(safe-area-inset-bottom));
     }
 }

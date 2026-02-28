@@ -95,7 +95,6 @@ export async function calculateStats(data, userData, friendsData) {
                 fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'),
                 fetch('https://raw.githubusercontent.com/gregoiredavid/france-geojson/master/departements-version-simplifiee.geojson')
             ]);
-            // On utilise les setters définis dans config.js
             setWorldGeoCache(await respWorld.json());
             setDepsGeoCache(await respDeps.json());
         }

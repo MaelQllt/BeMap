@@ -1,6 +1,5 @@
 /**
  * APP.JS — Point d'entrée principal
- * Gère l'upload, l'auto-login, l'initialisation et les interactions globales (clavier, relocation)
  */
 
 import { saveFileToSession, loadSessionFiles, checkDifferencesAndShowExport } from './db.js';
@@ -8,46 +7,15 @@ import { fileMap, setFileMap, allMemoriesData, setAllMemoriesData, isRelocating,
 import { map, setup3DBuildings, setupMapLayers, refreshMapMarkers, watchZoomRadius, showRelocationHighlight, clearRelocationHighlight } from './map.js';
 import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDash } from './dashboard.js';
 import { initBadge } from './badge.js';
-import { getLocalUrl, syncPWAHeight, setMapRef } from './utils.js';
+import { syncPWAHeight, setMapRef, getLocalUrl } from './utils.js';
+import { convertMemoriesToGeoJSON } from './geo-convert.js';
 import { nextPhoto, prevPhoto, closeModal } from './modal.js';
 import { initTimeline, applyFiltersToMap } from './timeline.js';
 import { initFilters, buildFiltersUI, closeFilters } from './filters.js';
+import { showMapToast, showStatsLoader, showRelocationBanner, hideRelocationBanner } from './ui.js';
 
 setMapRef(map);
 let _saveDebounceTimer = null;
-
-// --- TOAST INLINE CARTE ---
-function showMapToast(message, type = 'success') {
-    const existing = document.getElementById('map-toast');
-    if (existing) existing.remove();
-
-    const toast = document.createElement('div');
-    toast.id = 'map-toast';
-    toast.className = type === 'error' ? 'map-toast map-toast--error' : 'map-toast';
-    toast.innerText = message;
-
-    document.getElementById('map').appendChild(toast);
-    toast.getBoundingClientRect();
-    toast.classList.add('map-toast--visible');
-
-    setTimeout(() => { toast.classList.remove('map-toast--visible'); }, 2200);
-    setTimeout(() => { toast.remove(); }, 2700);
-}
-
-// --- LOADER STATS ---
-function showStatsLoader(visible) {
-    let loader = document.getElementById('stats-loader');
-    if (visible) {
-        if (loader) return;
-        loader = document.createElement('div');
-        loader.id = 'stats-loader';
-        loader.className = 'map-stats-loader';
-        loader.innerText = 'Repositionnement en cours…';
-        document.getElementById('map').appendChild(loader);
-    } else {
-        loader?.remove();
-    }
-}
 
 // --- DÉMARRAGE ANTICIPÉ ---
 if (localStorage.getItem('bereal_session_active') === 'true') {
@@ -55,40 +23,6 @@ if (localStorage.getItem('bereal_session_active') === 'true') {
     document.getElementById('upload-overlay').style.display = 'none';
 } else {
     document.getElementById('upload-overlay').style.display = 'flex';
-}
-
-// --- CONVERSION MEMORIES → GEOJSON ---
-export function convertMemoriesToGeoJSON(data) {
-    const seenIds = new Set();
-    return data.map(m => {
-        const momentId = m.berealMoment || m.takenTime || m.date;
-        const isBonus = seenIds.has(momentId);
-        seenIds.add(momentId);
-
-        const lng = parseFloat(m.location?.longitude);
-        const lat = parseFloat(m.location?.latitude);
-
-        const canBeRelocated = m._relocated === true
-            || ((isNaN(lng) || lng === 0) && (isNaN(lat) || lat === 0));
-
-        return {
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] },
-            properties: {
-                front:    getLocalUrl(m.frontImage?.path),
-                back:     getLocalUrl(m.backImage?.path),
-                caption:  m.caption || "",
-                location: m.location,
-                rawDate:  m.takenTime,
-                uid:      m.uid ?? m.takenTime,
-                canBeRelocated,
-                date:     m.takenTime ? new Date(m.takenTime).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : "",
-                time:     m.takenTime ? new Date(m.takenTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : "",
-                isLate:   m.isLate,
-                isBonus:  isBonus,
-            }
-        };
-    });
 }
 
 // --- INITIALISATION ---
@@ -125,6 +59,13 @@ async function initApp(userData, memoriesData, friendsData) {
 document.addEventListener('app:relocation-start', (e) => {
     const { uid, rawDate, location } = e.detail;
     setTimeout(() => showRelocationHighlight(uid, rawDate, location), 150);
+    showRelocationBanner(() => {
+        setIsRelocating(false);
+        clearRelocationHighlight();
+        document.getElementById('map').style.cursor = '';
+        hideRelocationBanner();
+        showMapToast('Repositionnement annulé.');
+    });
 });
 
 map.on('click', async (e) => {
@@ -141,7 +82,7 @@ map.on('click', async (e) => {
         return;
     }
 
-    allMemoriesData[index].location  = { latitude: lat, longitude: lng };
+    allMemoriesData[index].location   = { latitude: lat, longitude: lng };
     allMemoriesData[index]._relocated = true;
 
     clearTimeout(_saveDebounceTimer);
@@ -153,7 +94,13 @@ map.on('click', async (e) => {
     refreshMapMarkers(allMemoriesData, convertMemoriesToGeoJSON);
     checkDifferencesAndShowExport();
 
-    showStatsLoader(true);
+    const bannerWasVisible = !!document.getElementById('relocation-banner');
+    hideRelocationBanner();
+    setIsRelocating(false);
+    clearRelocationHighlight();
+    document.getElementById('map').style.cursor = '';
+
+    showStatsLoader(true, bannerWasVisible);
     try {
         const userData    = JSON.parse(await fileMap['user.json'].text());
         const friendsData = fileMap['friends.json'] ? JSON.parse(await fileMap['friends.json'].text()) : [];
@@ -166,9 +113,6 @@ map.on('click', async (e) => {
         showStatsLoader(false);
     }
 
-    setIsRelocating(false);
-    clearRelocationHighlight();
-    document.getElementById('map').style.cursor = '';
     showMapToast("Position mise à jour.");
 });
 
@@ -266,6 +210,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isRelocating) {
         setIsRelocating(false);
         clearRelocationHighlight();
+        hideRelocationBanner();
         document.getElementById('map').style.cursor = '';
         showMapToast("Repositionnement annulé.");
         return;

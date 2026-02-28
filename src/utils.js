@@ -11,36 +11,28 @@ export function setMapRef(m) { _mapRef = m; }
 
 /**
  * Retourne une Object URL locale pour un chemin de fichier de l'archive.
- * Les URLs sont mises en cache dans objectUrlCache pour éviter les doublons.
- * Les URLs créées pour le modal courant sont trackées dans _modalUrlKeys
- * afin d'être révoquées à la fermeture du modal (libération mémoire).
+ * Les URLs sont mises en cache dans objectUrlCache pour toute la session.
+ * La révocation globale est faite à la déconnexion dans handleLogout (dashboard.js).
  */
-const _modalUrlKeys = new Set(); // clés des URLs créées pour le modal ouvert
-
 export function getLocalUrl(jsonPath) {
     if (!jsonPath) return "";
-    let cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
+    const cleanPath = jsonPath.startsWith('/') ? jsonPath.substring(1) : jsonPath;
 
-    if (objectUrlCache.has(cleanPath)) {
-        _modalUrlKeys.add(cleanPath); // déjà en cache, on note quand même pour tracking
-        return objectUrlCache.get(cleanPath);
-    }
+    if (objectUrlCache.has(cleanPath)) return objectUrlCache.get(cleanPath);
 
     let file = fileMap[cleanPath] || null;
 
     if (!file) {
         const fileName = cleanPath.split('/').pop();
-        const foldersToTry = ["Photos/post/", "Photos/profile/", "Photos/bereal/"];
-        for (let folder of foldersToTry) {
+        for (const folder of ["Photos/post/", "Photos/profile/", "Photos/bereal/"]) {
             if (fileMap[folder + fileName]) { file = fileMap[folder + fileName]; break; }
         }
     }
 
     if (file) {
-        const newUrl = URL.createObjectURL(file);
-        objectUrlCache.set(cleanPath, newUrl);
-        _modalUrlKeys.add(cleanPath);
-        return newUrl;
+        const url = URL.createObjectURL(file);
+        objectUrlCache.set(cleanPath, url);
+        return url;
     }
 
     console.warn("Fichier non trouvé :", cleanPath);
