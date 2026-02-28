@@ -89,9 +89,14 @@ function initDrag() {
         if (e.target.closest('button')) return;
         startDrag(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: true });
-    document.addEventListener('touchmove', (e) => {
-        if (isDragging) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-    }, { passive: true });
+
+    // touchmove sur le handle avec passive:false pour bloquer le scroll carte pendant le drag
+    handle.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: false });
+
     document.addEventListener('touchend', endDrag);
 }
 
@@ -137,13 +142,15 @@ function openFiltersModal() {
             const btnRect     = toggler.getBoundingClientRect();
             const modalW      = modal.offsetWidth  || 300;
             const modalH      = modal.offsetHeight || 360;
-            const gap         = 14;
+            const gap         = 10;
 
+            // Aligné à droite avec le bouton, pile au-dessus
             let left = btnRect.right - modalW;
             let top  = btnRect.top - modalH - gap;
 
+            // Safe area : ne sort pas de l'écran
             left = Math.max(8, Math.min(left, window.innerWidth  - modalW - 8));
-            top  = Math.max(8, Math.min(top,  window.innerHeight - modalH - 8));
+            top  = Math.max(8, top); // on ne clamp pas en bas pour rester au-dessus du bouton
 
             modal.style.bottom = 'auto';
             modal.style.right  = 'auto';

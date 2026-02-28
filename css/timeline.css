@@ -494,16 +494,28 @@
 #timeline-close-btn::before { transform: translate(-50%, -50%) rotate(45deg); }
 #timeline-close-btn::after  { transform: translate(-50%, -50%) rotate(-45deg); }
 
-/* Hover : tourne de 90deg supplémentaires */
-#filters-close-btn:hover::before  { transform: translate(-50%, -50%) rotate(135deg); }
-#filters-close-btn:hover::after   { transform: translate(-50%, -50%) rotate(45deg); }
-#timeline-close-btn:hover::before { transform: translate(-50%, -50%) rotate(135deg); }
-#timeline-close-btn:hover::after  { transform: translate(-50%, -50%) rotate(45deg); }
+/* Hover : tourne de 90deg supplémentaires — desktop uniquement */
+@media (pointer: fine) {
+    #filters-close-btn:hover::before  { transform: translate(-50%, -50%) rotate(135deg); }
+    #filters-close-btn:hover::after   { transform: translate(-50%, -50%) rotate(45deg); }
+    #timeline-close-btn:hover::before { transform: translate(-50%, -50%) rotate(135deg); }
+    #timeline-close-btn:hover::after  { transform: translate(-50%, -50%) rotate(45deg); }
 
-#filters-close-btn:hover  { background: rgba(255,255,255,0.14); }
-#filters-close-btn:hover::before, #filters-close-btn:hover::after { opacity: 0.9; }
-#timeline-close-btn:hover { background: rgba(255,255,255,0.15); }
-#timeline-close-btn:hover::before, #timeline-close-btn:hover::after { opacity: 0.9; }
+    #filters-close-btn:hover  { background: rgba(255,255,255,0.14); }
+    #filters-close-btn:hover::before, #filters-close-btn:hover::after { opacity: 0.9; }
+    #timeline-close-btn:hover { background: rgba(255,255,255,0.15); }
+    #timeline-close-btn:hover::before, #timeline-close-btn:hover::after { opacity: 0.9; }
+}
+
+/* Tap mobile : feedback :active uniquement, pas de hover collant */
+@media (pointer: coarse) {
+    #filters-close-btn:active,
+    #timeline-close-btn:active { background: rgba(255,255,255,0.14); }
+    #filters-close-btn:active::before,
+    #filters-close-btn:active::after,
+    #timeline-close-btn:active::before,
+    #timeline-close-btn:active::after { opacity: 0.9; }
+}
 
 /* ============================================================
    5. MOBILE (pointer: coarse) — deux états : discret | actif
@@ -611,11 +623,120 @@
         gap: 0;
     }
     .tl-line {
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 600;
         line-height: 1.2;
         color: #fff;
         text-shadow: 0 1px 6px rgba(0,0,0,0.6);
     }
     .timeline-count { font-size: 11px; }
+}
+
+/* ============================================================
+   6. FILTRES MOBILE — Flottant, chips agrandies, drag conservé
+   ============================================================ */
+
+@media (pointer: coarse) {
+
+    /* Modal légèrement plus large */
+    #filters-modal {
+        width: 320px;
+    }
+
+    /* Handle — plus de place pour les doigts */
+    .filters-drag-handle {
+        padding: 18px 20px 14px;
+    }
+
+    .filters-title {
+        font-size: 16px;
+    }
+
+    /* Boutons collapse / close : 36px (touch target confortable) */
+    #filters-collapse-btn,
+    #filters-close-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    #filters-close-btn::before,
+    #filters-close-btn::after {
+        width: 13px;
+        height: 2px;
+    }
+
+    /* Reset */
+    #filters-reset-btn {
+        font-size: 11px;
+        padding: 6px 13px;
+    }
+
+    /* Corps */
+    .filters-body {
+        padding: 0 20px 20px;
+        gap: 16px;
+    }
+
+    .filter-section-label {
+        font-size: 10px;
+        margin-bottom: 10px;
+    }
+
+    /* Gap entre chips */
+    .filter-chips-row {
+        gap: 8px;
+    }
+
+    /* Chips : taille agrandie */
+    .filter-chip {
+        font-size: 13px;
+        border-radius: 12px;
+    }
+
+    /* Supprime hover collant sur mobile */
+    .filter-chip:hover {
+        transform: none;
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.6);
+    }
+    .filter-chip--active:hover {
+        background: #fff;
+        color: #000;
+        transform: none;
+    }
+
+    /* Feedback tap */
+    .filter-chip:active {
+        transform: scale(0.94);
+        background: rgba(255, 255, 255, 0.18);
+    }
+    .filter-chip--active:active {
+        background: rgba(255, 255, 255, 0.82);
+    }
+
+    /* Années */
+    .filter-chip--year {
+        width: 66px;
+        padding: 10px 0;
+    }
+
+    /* Mois */
+    .filter-chip--month {
+        width: 48px;
+        padding: 10px 0;
+    }
+
+    /* Ponctualité */
+    #filter-ontime-container {
+        gap: 6px;
+    }
+    .filter-chip--ontime {
+        padding: 10px 0;
+        font-size: 12px;
+    }
+
+    #filter-result-count {
+        font-size: 11px;
+    }
 }
