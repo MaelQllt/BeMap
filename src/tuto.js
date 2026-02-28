@@ -1,146 +1,157 @@
-(function() {
+(function () {
 
-    // ── Durées centralisées ───────────────────────────────────────────────
-    const SLIDE_DURATION_MS = 750;   // durée de la transition image (ms)
-    const TEXT_FADE_MS      = 200;   // durée du fade texte — doit être < SLIDE_DURATION_MS / 2
-    const AUTO_INTERVAL_MS  = 4500;  // délai entre deux slides en autoplay (ms)
+    // ── Constantes ────────────────────────────────────────────────────────
+    const SLIDE_MS         = 650;
+    const TEXT_FADE_MS     = 180;
+    const AUTO_INTERVAL_MS = 4500;
 
-    // ── Construction d'une slide ──────────────────────────────────────────
-    function buildSlide(data, basePath, isClone) {
+    // ── buildSlide ────────────────────────────────────────────────────────
+    function buildSlide(data) {
         const slide = document.createElement('div');
-        slide.className = 'tuto-slide' + (isClone ? ' tuto-slide--clone' : '');
-
-        const placeholder = document.createElement('div');
-        placeholder.className = 'tuto-img-placeholder';
-
+        slide.className = 'tuto-slide';
+        const wrap = document.createElement('div');
+        wrap.className = 'tuto-img-placeholder';
         if (data.img) {
             const img = document.createElement('img');
-            img.src = basePath + data.img;
+            img.src = data._src;
             img.alt = '';
-            img.loading = 'eager';
-            placeholder.appendChild(img);
+            wrap.appendChild(img);
         } else {
             const icon = document.createElement('span');
             icon.className = 'tuto-img-icon';
             icon.textContent = data.icon || '';
-            placeholder.appendChild(icon);
+            wrap.appendChild(icon);
         }
-
-        slide.appendChild(placeholder);
+        slide.appendChild(wrap);
         return slide;
     }
 
-    // ── Construit les dots ────────────────────────────────────────────────
+    // ── buildDots ─────────────────────────────────────────────────────────
     function buildDots(dotsEl, count) {
         dotsEl.innerHTML = '';
         for (let i = 0; i < count; i++) {
-            const dot = document.createElement('span');
-            dot.className = 'tuto-dot' + (i === 0 ? ' tuto-dot--active' : '');
-            dotsEl.appendChild(dot);
+            const d = document.createElement('span');
+            d.className = 'tuto-dot' + (i === 0 ? ' tuto-dot--active' : '');
+            dotsEl.appendChild(d);
         }
     }
 
-    // ── Carousel infini ───────────────────────────────────────────────────
+    // ── makeCarousel ──────────────────────────────────────────────────────
     function makeCarousel(overlayId, innerId, dotsId, openBtnId, textId, slides) {
         const overlay = document.getElementById(overlayId);
-        const inner   = document.getElementById(innerId);
+        const track   = document.getElementById(innerId);
         const dotsEl  = document.getElementById(dotsId);
         const textEl  = document.getElementById(textId);
         const openBtn = document.getElementById(openBtnId);
-        if (!overlay || !inner) return;
+        if (!overlay || !track) return;
 
-        const realCount  = slides.length;
-        const DOM_OFFSET = 1;
+        const N = slides.length;
+        let current     = 0;
+        let isAnimating = false;
+        let isClosed    = true;
+        let autoTimer   = null;
+        let textTimer   = null;
+        let pendingNext = null; // index en attente si input reçu pendant animation
 
-        let current       = 0;
-        let autoTimer     = null;
-        let isJumping     = false;
-        let isClosed      = true;
-        let textFadeTimer = null;
+        function mod(n) { return ((n % N) + N) % N; }
 
-        const allSlides = () => Array.from(inner.querySelectorAll('.tuto-slide'));
-
-        function resetPosition() {
-            inner.style.transition = 'none';
-            inner.style.transform  = `translateX(-${DOM_OFFSET * 100}%)`;
-            inner.getBoundingClientRect();
+        function setDots(idx) {
+            if (!dotsEl) return;
+            Array.from(dotsEl.querySelectorAll('.tuto-dot'))
+                .forEach((d, i) => d.classList.toggle('tuto-dot--active', i === idx));
         }
 
-        function setDots(logicalIdx) {
-            const dots = dotsEl ? Array.from(dotsEl.querySelectorAll('.tuto-dot')) : [];
-            dots.forEach((d, i) => d.classList.toggle('tuto-dot--active', i === logicalIdx));
-        }
-
-        // Texte : fade out → swap contenu → fade in
-        function setTextSmooth(logicalIdx) {
+        function setTextSmooth(idx) {
             if (!textEl) return;
-            clearTimeout(textFadeTimer);
-            if (!textEl.dataset.fadeReady) {
-                textEl.style.transition = `opacity ${TEXT_FADE_MS}ms ease`;
-                textEl.dataset.fadeReady = '1';
-            }
-            textEl.style.opacity = '0';
-            textFadeTimer = setTimeout(() => {
-                textEl.innerHTML     = slides[logicalIdx]?.text || '';
+            clearTimeout(textTimer);
+            textEl.style.transition = `opacity ${TEXT_FADE_MS}ms ease`;
+            textEl.style.opacity    = '0';
+            textTimer = setTimeout(() => {
+                textEl.innerHTML     = slides[idx]?.text || '';
                 textEl.style.opacity = '1';
             }, TEXT_FADE_MS);
         }
 
-        // setActive silencieux — pas de fade, utilisé pour les sauts et l'init
-        function setActiveSilent(logicalIdx) {
-            allSlides().forEach(s => s.classList.remove('tuto-slide--active'));
-            allSlides()[logicalIdx + DOM_OFFSET]?.classList.add('tuto-slide--active');
-            setDots(logicalIdx);
-            if (textEl) {
-                clearTimeout(textFadeTimer);
-                textEl.style.opacity = '1';
-                textEl.innerHTML = slides[logicalIdx]?.text || '';
-            }
+        function setTextSilent(idx) {
+            if (!textEl) return;
+            clearTimeout(textTimer);
+            textEl.style.transition = 'none';
+            textEl.style.opacity    = '1';
+            textEl.innerHTML        = slides[idx]?.text || '';
         }
 
-        // Repositionnement instantané sans animation visible (loop infini)
-        function jumpSilently(domIdx) {
-            isJumping = true;
-            inner.style.transition = 'none';
-            inner.style.transform  = `translateX(-${domIdx * 100}%)`;
-            inner.getBoundingClientRect();
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                const logicalIdx = ((domIdx - DOM_OFFSET) % realCount + realCount) % realCount;
-                setActiveSilent(logicalIdx);
-                isJumping = false;
-            }));
-        }
+        // ── Transition principale ─────────────────────────────────────────
+        function animate(nextIdx, direction) {
+            isAnimating = true;
+            pendingNext = null;
 
-        // Transition principale avec easing smooth
-        function goTo(logicalIdx) {
-            if (isJumping || isClosed) return;
-            const domIdx = logicalIdx + DOM_OFFSET;
-            inner.style.transition = `transform ${SLIDE_DURATION_MS}ms cubic-bezier(0.45, 0, 0.15, 1)`;
-            inner.style.transform  = `translateX(-${domIdx * 100}%)`;
-            current = ((logicalIdx % realCount) + realCount) % realCount;
+            const slideA = track.querySelector('.tuto-slide');
+            const slideB = buildSlide(slides[nextIdx]);
+
+            slideB.style.position   = 'absolute';
+            slideB.style.inset      = '0';
+            slideB.style.transform  = `translateX(${direction * 100}%)`;
+            slideB.style.transition = 'none';
+            track.appendChild(slideB);
+
+            slideB.getBoundingClientRect(); // force reflow
+
+            const ease = `transform ${SLIDE_MS}ms cubic-bezier(0.45, 0, 0.15, 1)`;
+            slideA.style.transition = ease;
+            slideB.style.transition = ease;
+            slideA.style.transform  = `translateX(${-direction * 100}%)`;
+            slideB.style.transform  = 'translateX(0%)';
+
+            current = nextIdx;
             setDots(current);
             setTextSmooth(current);
+
+            setTimeout(() => {
+                slideA.remove();
+                slideB.style.transition = 'none';
+                slideB.style.transform  = '';
+                slideB.style.position   = '';
+                slideB.style.inset      = '';
+                isAnimating = false;
+
+                // Exécute l'input en attente s'il y en a un
+                if (pendingNext !== null && !isClosed) {
+                    const { idx, dir } = pendingNext;
+                    pendingNext = null;
+                    animate(idx, dir);
+                }
+            }, SLIDE_MS);
         }
 
-        // Détection arrivée sur un clone → jump vers le vrai slide
-        inner.addEventListener('transitionend', (e) => {
-            if (e.propertyName !== 'transform' || isClosed) return;
-            const match = inner.style.transform.match(/-?([\d.]+)%/);
-            if (!match) return;
-            const domIdx = Math.round(-parseFloat(match[0]) / 100);
-            if (domIdx === realCount + 1) jumpSilently(DOM_OFFSET);
-            if (domIdx === 0)             jumpSilently(realCount);
-        });
+        // ── goTo public — met en file si animating ────────────────────────
+        function goTo(nextIdx, direction) {
+            if (isClosed) return;
+            nextIdx = mod(nextIdx);
+            if (nextIdx === current && !isAnimating) return;
 
-        function startAuto() { stopAuto(); autoTimer = setInterval(() => goTo(current + 1), AUTO_INTERVAL_MS); }
+            if (isAnimating) {
+                // Écrase le pending précédent — on garde seulement le dernier input
+                pendingNext = { idx: nextIdx, dir: direction };
+                return;
+            }
+            animate(nextIdx, direction);
+        }
+
+        // ── Autoplay ──────────────────────────────────────────────────────
+        function startAuto() { stopAuto(); autoTimer = setInterval(() => goTo(current + 1, 1), AUTO_INTERVAL_MS); }
         function stopAuto()  { clearInterval(autoTimer); autoTimer = null; }
 
+        // ── Ouverture ─────────────────────────────────────────────────────
         function openModal() {
             stopAuto();
-            isJumping = true;
-            resetPosition();
+            isAnimating = false;
+            pendingNext = null;
+
+            track.innerHTML = '';
+            track.appendChild(buildSlide(slides[0]));
             current = 0;
-            setActiveSilent(0);
+            setDots(0);
+            setTextSilent(0);
 
             const backdrop = document.getElementById('tuto-backdrop-global');
             backdrop?.classList.add('tuto-backdrop--visible');
@@ -150,16 +161,17 @@
             requestAnimationFrame(() => requestAnimationFrame(() => {
                 overlay.style.opacity = '1';
                 overlay.classList.add('tuto-overlay--visible');
-                isClosed  = false;
-                isJumping = false;
+                isClosed = false;
                 startAuto();
             }));
         }
 
+        // ── Fermeture ─────────────────────────────────────────────────────
         function closeModal() {
-            isClosed  = true;
-            isJumping = false;
-            clearTimeout(textFadeTimer);
+            isClosed    = true;
+            isAnimating = false;
+            pendingNext = null;
+            clearTimeout(textTimer);
             stopAuto();
             const backdrop = document.getElementById('tuto-backdrop-global');
             backdrop?.classList.remove('tuto-backdrop--visible');
@@ -173,6 +185,7 @@
             document.activeElement?.blur();
         }
 
+        // ── Listeners ─────────────────────────────────────────────────────
         openBtn?.addEventListener('click', openModal);
         overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
 
@@ -180,67 +193,70 @@
             const dot = e.target.closest('.tuto-dot');
             if (!dot) return;
             const idx = Array.from(dotsEl.querySelectorAll('.tuto-dot')).indexOf(dot);
-            stopAuto(); goTo(idx); startAuto();
+            const dir = idx >= current ? 1 : -1;
+            stopAuto(); goTo(idx, dir); startAuto();
         });
 
         // Touch
         let touchStartX = 0, isTouching = false;
-        inner.addEventListener('touchstart', (e) => {
+        track.addEventListener('touchstart', (e) => {
             touchStartX = e.touches[0].clientX; isTouching = true; stopAuto();
         }, { passive: true });
-        inner.addEventListener('touchend', (e) => {
+        track.addEventListener('touchend', (e) => {
             if (!isTouching) return;
             const diff = touchStartX - e.changedTouches[0].clientX;
-            if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1));
+            if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1), diff > 0 ? 1 : -1);
             isTouching = false; startAuto();
         });
 
         // Souris
         let mouseStartX = 0, isMouseDragging = false;
-        inner.addEventListener('mousedown', (e) => {
+        track.addEventListener('mousedown', (e) => {
             mouseStartX = e.clientX; isMouseDragging = true; stopAuto(); e.preventDefault();
         });
         document.addEventListener('mouseup', (e) => {
             if (!isMouseDragging) return;
             const diff = mouseStartX - e.clientX;
-            if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1));
+            if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1), diff > 0 ? 1 : -1);
             isMouseDragging = false; startAuto();
         });
 
         // Clavier
         document.addEventListener('keydown', (e) => {
             if (!overlay.classList.contains('tuto-overlay--visible')) return;
-            if (e.key === 'ArrowRight') { stopAuto(); goTo(current + 1); startAuto(); }
-            if (e.key === 'ArrowLeft')  { stopAuto(); goTo(current - 1); startAuto(); }
+            if (e.key === 'ArrowRight') { stopAuto(); goTo(current + 1,  1); startAuto(); }
+            if (e.key === 'ArrowLeft')  { stopAuto(); goTo(current - 1, -1); startAuto(); }
             if (e.key === 'Escape')     closeModal();
         });
 
-        resetPosition();
-        setActiveSilent(0);
+        setDots(0);
+        setTextSilent(0);
     }
 
-    // ── Chargement des JSON et initialisation ─────────────────────────────
+    // ── loadAndInit ───────────────────────────────────────────────────────
     async function loadAndInit(config) {
         const { jsonPath, basePath, overlayId, innerId, dotsId, textId, openBtnId } = config;
         try {
             const res    = await fetch(jsonPath);
             const slides = await res.json();
-            const inner  = document.getElementById(innerId);
+            const track  = document.getElementById(innerId);
             const dotsEl = document.getElementById(dotsId);
-            if (!inner) return;
+            if (!track) return;
 
-            await Promise.all(
-                slides.filter(s => s.img).map(s => new Promise(resolve => {
-                    const img = new Image();
-                    img.onload = img.onerror = resolve;
-                    img.src = basePath + s.img;
-                }))
-            );
+            await Promise.all(slides.map(s => new Promise(resolve => {
+                if (!s.img) { resolve(); return; }
+                s._src = basePath + s.img;
+                const img = new Image();
+                img.onload = img.onerror = resolve;
+                img.src = s._src;
+            })));
 
-            inner.innerHTML = '';
-            inner.appendChild(buildSlide(slides[slides.length - 1], basePath, true));
-            slides.forEach(s => inner.appendChild(buildSlide(s, basePath, false)));
-            inner.appendChild(buildSlide(slides[0], basePath, true));
+            track.innerHTML = '';
+            track.appendChild(buildSlide(slides[0]));
+            track.style.position = 'relative';
+            track.style.overflow = 'hidden';
+            track.style.width    = '100%';
+            track.style.height   = '100%';
 
             buildDots(dotsEl, slides.length);
             makeCarousel(overlayId, innerId, dotsId, openBtnId, textId, slides);
@@ -258,7 +274,6 @@
         textId:    'howto-text',
         openBtnId: 'tuto-howto-btn',
     });
-
     loadAndInit({
         jsonPath:  'tuto/apercu/content.json',
         basePath:  'tuto/apercu/',
@@ -269,7 +284,7 @@
         openBtnId: 'tuto-whatis-btn',
     });
 
-    // ── Désactive les boutons tuto pendant le chargement de la session ────
+    // ── Désactive les boutons pendant le chargement ───────────────────────
     const statusMsg = document.getElementById('status-msg');
     const tutoBtns  = [
         document.getElementById('tuto-howto-btn'),
