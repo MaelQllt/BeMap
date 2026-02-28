@@ -158,22 +158,34 @@
     transition: transform 0.3s ease, scale 0.3s ease;
 }
 
-.map-control-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.4);
-    transform: scale(1.1);
+/* Hover desktop uniquement */
+@media (pointer: fine) {
+    .map-control-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: scale(1.1);
+    }
+    .map-control-btn--compass:hover svg { scale: 1.3; }
+    .map-control-btn--pitch:hover svg { scale: 1.3; }
 }
-
-.map-control-btn--compass:hover svg { scale: 1.3; }
 
 .map-control-btn--pitch svg {
     transform: scale(1.3);
     overflow: visible;
 }
-.map-control-btn--pitch:hover svg { scale: 1.3; }
 
+/* Active : commun desktop + mobile */
 .map-control-btn:active { transform: scale(0.95); }
 .map-control-btn:active svg { scale: 1; transform: scale(1); }
+
+/* Mobile : feedback au tap, fond allumé brièvement */
+@media (pointer: coarse) {
+    .map-control-btn:active {
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: scale(0.93);
+    }
+}
 
 .pitch-line-bg { opacity: 0.3; }
 
@@ -203,21 +215,25 @@
         border-color 0.3s ease !important;
 }
 
-.map-control-btn--terrain:hover,
-.map-control-btn--terrain.nearby {
-    opacity: 1 !important;
-    transform: scale(1.1) !important;
+/* Terrain — hover desktop uniquement */
+@media (pointer: fine) {
+    .map-control-btn--terrain:hover,
+    .map-control-btn--terrain.nearby {
+        opacity: 1 !important;
+        transform: scale(1.1) !important;
+    }
+    .map-control-btn--terrain:hover svg {
+        transform: scale(1.3);
+        overflow: visible;
+    }
+    .map-control-btn--terrain.active:hover {
+        background: rgba(255, 255, 255, 0.22);
+        border-color: rgba(255, 255, 255, 0.6);
+        transform: scale(1.1) !important;
+    }
 }
 
-.map-control-btn--terrain:hover svg {
-    transform: scale(1.3);
-    overflow: visible;
-}
-
-.map-control-btn--terrain:active {
-    transform: scale(0.95) !important;
-}
-
+/* Terrain — état actif (terrain ON), commun */
 .map-control-btn--terrain.active {
     opacity: 1 !important;
     background: rgba(255, 255, 255, 0.15);
@@ -225,10 +241,19 @@
     color: #ffffff;
 }
 
-.map-control-btn--terrain.active:hover {
-    background: rgba(255, 255, 255, 0.22);
-    border-color: rgba(255, 255, 255, 0.6);
-    transform: scale(1.1) !important;
+/* Terrain — tap/click, commun */
+.map-control-btn--terrain:active {
+    transform: scale(0.93) !important;
+}
+
+/* Terrain — mobile : tap = feedback immédiat, pas de hover collant */
+@media (pointer: coarse) {
+    .map-control-btn--terrain:active {
+        opacity: 1 !important;
+        background: rgba(255, 255, 255, 0.2);
+        border-color: rgba(255, 255, 255, 0.4);
+        transform: scale(0.93) !important;
+    }
 }
 
 /* --- TOAST INLINE CARTE --- */
@@ -324,4 +349,33 @@
     pointer-events: none;
     z-index: 10;
     transform: translate(-50%, -50%);
+}
+
+/* --- CONTRÔLES CARTE : TAILLE MOBILE (44pt) --- */
+@media (pointer: coarse) {
+    .map-controls { height: 44px; }
+    .map-control-btn { width: 44px; height: 44px; margin-left: 10px; }
+    .map-control-btn.visible { width: 44px; }
+    .map-control-btn--terrain { width: 44px !important; margin-left: 10px !important; }
+
+    /* SVG plus grands */
+    .map-control-btn svg { min-width: 24px; height: 24px; }
+    .map-control-btn--pitch svg { transform: scale(1.4); }
+
+    /* Feedback icône au tap */
+    .map-control-btn:active svg {
+        opacity: 0.5;
+        transform: scale(0.85);
+        transition: opacity 0.05s ease, transform 0.05s ease;
+    }
+    .map-control-btn--pitch:active svg {
+        opacity: 0.5;
+        transform: scale(1.1);
+        transition: opacity 0.05s ease, transform 0.05s ease;
+    }
+    .map-control-btn--terrain:active svg {
+        opacity: 0.5;
+        transform: scale(0.85);
+        transition: opacity 0.05s ease, transform 0.05s ease;
+    }
 }
