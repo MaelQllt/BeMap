@@ -64,22 +64,32 @@
         </div>
     </div>
 
-    <!-- Modale "comment faire ?" — slides injectées dynamiquement depuis tuto/howto/content.json -->
+    <!-- Backdrop partagé pour les modales tuto — SÉPARÉ des overlays pour que
+         backdrop-filter ne floute pas le contenu de l'overlay -->
+    <div id="tuto-backdrop-global" class="tuto-backdrop-global"></div>
+
+    <!-- Modale "comment faire ?" -->
     <div id="tuto-overlay" class="tuto-overlay" data-tuto="howto" style="display:none;">
-        <div class="tuto-modal">
-            <div class="tuto-track">
-                <div class="tuto-slides-inner" id="howto-inner"></div>
+        <div class="tuto-modal-wrapper">
+            <div class="tuto-modal">
+                <div class="tuto-track">
+                    <div class="tuto-slides-inner" id="howto-inner"></div>
+                </div>
             </div>
+            <p class="tuto-text" id="howto-text"></p>
             <div class="tuto-dots" id="howto-dots"></div>
         </div>
     </div>
 
-    <!-- Modale "aperçu" — slides injectées dynamiquement depuis tuto/apercu/content.json -->
+    <!-- Modale "aperçu" -->
     <div id="tuto-whatis-overlay" class="tuto-overlay" data-tuto="whatis" style="display:none;">
-        <div class="tuto-modal">
-            <div class="tuto-track">
-                <div class="tuto-slides-inner" id="whatis-inner"></div>
+        <div class="tuto-modal-wrapper">
+            <div class="tuto-modal">
+                <div class="tuto-track">
+                    <div class="tuto-slides-inner" id="whatis-inner"></div>
+                </div>
             </div>
+            <p class="tuto-text" id="whatis-text"></p>
             <div class="tuto-dots" id="whatis-dots"></div>
         </div>
     </div>
@@ -338,259 +348,7 @@
     <script type="module" src="src/app.js"></script>
 
     <!-- Tuto -->
-    <script>
-    (function() {
-
-        // ── Construction d'une slide à partir d'un objet JSON ─────────────────
-        // Format d'une entrée dans content.json :
-        // { "icon": "📧", "img": "slide-1.jpg", "text": "Mon texte avec <strong>HTML</strong>" }
-        // "img" et "icon" sont tous les deux optionnels (icon affiché si pas d'image)
-        function buildSlide(data, basePath, isClone) {
-            const slide = document.createElement('div');
-            slide.className = 'tuto-slide' + (isClone ? ' tuto-slide--clone' : '');
-
-            const placeholder = document.createElement('div');
-            placeholder.className = 'tuto-img-placeholder';
-
-            if (data.img) {
-                const img = document.createElement('img');
-                img.src = basePath + data.img;
-                img.alt = '';
-                img.loading = 'lazy';
-                placeholder.appendChild(img);
-            } else {
-                const icon = document.createElement('span');
-                icon.className = 'tuto-img-icon';
-                icon.textContent = data.icon || '';
-                placeholder.appendChild(icon);
-            }
-
-            const text = document.createElement('p');
-            text.className = 'tuto-text';
-            text.innerHTML = data.text || '';
-
-            slide.appendChild(placeholder);
-            slide.appendChild(text);
-            return slide;
-        }
-
-        // ── Construit les dots ────────────────────────────────────────────────
-        function buildDots(dotsEl, count) {
-            dotsEl.innerHTML = '';
-            for (let i = 0; i < count; i++) {
-                const dot = document.createElement('span');
-                dot.className = 'tuto-dot' + (i === 0 ? ' tuto-dot--active' : '');
-                dotsEl.appendChild(dot);
-            }
-        }
-
-        // ── Carousel infini ───────────────────────────────────────────────────
-        function makeCarousel(overlayId, innerId, dotsId, openBtnId, slides) {
-            const overlay = document.getElementById(overlayId);
-            const inner   = document.getElementById(innerId);
-            const dotsEl  = document.getElementById(dotsId);
-            const openBtn = document.getElementById(openBtnId);
-            if (!overlay || !inner) return;
-
-            const realCount = slides.length;
-            const DOM_OFFSET = 1; // clone-last est à l'index 0
-
-            let current   = 0;
-            let autoTimer = null;
-            let startX    = 0;
-            let isDragging = false;
-            let isJumping  = false;
-
-            // Init position (sans transition)
-            inner.style.transition = 'none';
-            inner.style.transform  = `translateX(-${DOM_OFFSET * 100}%)`;
-
-            const allSlides = () => Array.from(inner.querySelectorAll('.tuto-slide'));
-
-            function setActive(logicalIdx) {
-                allSlides().forEach(s => s.classList.remove('tuto-slide--active'));
-                allSlides()[logicalIdx + DOM_OFFSET]?.classList.add('tuto-slide--active');
-                const dots = dotsEl ? Array.from(dotsEl.querySelectorAll('.tuto-dot')) : [];
-                dots.forEach((d, i) => d.classList.toggle('tuto-dot--active', i === logicalIdx));
-            }
-
-            function jumpSilently(domIdx) {
-                isJumping = true;
-                inner.style.transition = 'none';
-                inner.style.transform  = `translateX(-${domIdx * 100}%)`;
-                inner.getBoundingClientRect(); // force reflow
-                isJumping = false;
-            }
-
-            function goTo(logicalIdx) {
-                if (isJumping) return;
-                current = ((logicalIdx % realCount) + realCount) % realCount;
-                inner.style.transition = 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)';
-                inner.style.transform  = `translateX(-${(current + DOM_OFFSET) * 100}%)`;
-                setActive(current);
-            }
-
-            inner.addEventListener('transitionend', () => {
-                const domIdx = current + DOM_OFFSET;
-                if (domIdx === realCount + 1) jumpSilently(DOM_OFFSET);        // dernier → premier
-                if (domIdx === 0)             jumpSilently(realCount);          // premier → dernier
-            });
-
-            function startAuto() { stopAuto(); autoTimer = setInterval(() => goTo(current + 1), 3500); }
-            function stopAuto()  { clearInterval(autoTimer); }
-
-            function openModal() {
-                overlay.style.display = 'flex';
-                overlay.style.opacity = '0';
-                requestAnimationFrame(() => requestAnimationFrame(() => {
-                    overlay.style.opacity = '1';
-                    overlay.classList.add('tuto-overlay--visible');
-                }));
-                inner.style.transition = 'none';
-                inner.style.transform  = `translateX(-${DOM_OFFSET * 100}%)`;
-                current = 0;
-                setActive(0);
-                startAuto();
-            }
-
-            function closeModal() {
-                overlay.style.opacity = '0';
-                overlay.classList.remove('tuto-overlay--visible');
-                setTimeout(() => { overlay.style.display = 'none'; overlay.style.opacity = ''; }, 320);
-                stopAuto();
-                document.activeElement?.blur();
-            }
-
-            openBtn?.addEventListener('click', openModal);
-            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-
-            dotsEl?.addEventListener('click', (e) => {
-                const dot = e.target.closest('.tuto-dot');
-                if (!dot) return;
-                const idx = Array.from(dotsEl.querySelectorAll('.tuto-dot')).indexOf(dot);
-                goTo(idx); stopAuto(); startAuto();
-            });
-
-            // Swipe touch
-            inner.addEventListener('touchstart', (e) => {
-                startX = e.touches[0].clientX; isDragging = true; stopAuto();
-            }, { passive: true });
-            inner.addEventListener('touchend', (e) => {
-                if (!isDragging) return;
-                const diff = startX - e.changedTouches[0].clientX;
-                if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1));
-                isDragging = false; startAuto();
-            });
-
-            // Drag souris
-            inner.addEventListener('mousedown', (e) => { startX = e.clientX; isDragging = true; stopAuto(); e.preventDefault(); });
-            document.addEventListener('mouseup', (e) => {
-                if (!isDragging) return;
-                const diff = startX - e.clientX;
-                if (Math.abs(diff) > 40) goTo(current + (diff > 0 ? 1 : -1));
-                isDragging = false; startAuto();
-            });
-
-            // Clavier
-            document.addEventListener('keydown', (e) => {
-                if (!overlay.classList.contains('tuto-overlay--visible')) return;
-                if (e.key === 'ArrowRight') { goTo(current + 1); stopAuto(); startAuto(); }
-                if (e.key === 'ArrowLeft')  { goTo(current - 1); stopAuto(); startAuto(); }
-                if (e.key === 'Escape')     closeModal();
-            });
-
-            setActive(0);
-        }
-
-        // ── Chargement des JSON et initialisation ─────────────────────────────
-        async function loadAndInit(config) {
-            const { jsonPath, basePath, overlayId, innerId, dotsId, openBtnId } = config;
-            try {
-                const res    = await fetch(jsonPath);
-                const slides = await res.json();
-                const inner  = document.getElementById(innerId);
-                const dotsEl = document.getElementById(dotsId);
-                if (!inner) return;
-
-                // Vide le conteneur au cas où
-                inner.innerHTML = '';
-
-                // Clone du dernier slide (infinite loop — sens ←)
-                inner.appendChild(buildSlide(slides[slides.length - 1], basePath, true));
-                // Vrais slides
-                slides.forEach(s => inner.appendChild(buildSlide(s, basePath, false)));
-                // Clone du premier slide (infinite loop — sens →)
-                inner.appendChild(buildSlide(slides[0], basePath, true));
-
-                // Dots
-                buildDots(dotsEl, slides.length);
-
-                makeCarousel(overlayId, innerId, dotsId, openBtnId, slides);
-            } catch (err) {
-                console.warn(`[Tuto] Impossible de charger ${jsonPath}`, err);
-            }
-        }
-
-        loadAndInit({
-            jsonPath:  'tuto/howto/content.json',
-            basePath:  'tuto/howto/',
-            overlayId: 'tuto-overlay',
-            innerId:   'howto-inner',
-            dotsId:    'howto-dots',
-            openBtnId: 'tuto-howto-btn',
-        });
-
-        loadAndInit({
-            jsonPath:  'tuto/apercu/content.json',
-            basePath:  'tuto/apercu/',
-            overlayId: 'tuto-whatis-overlay',
-            innerId:   'whatis-inner',
-            dotsId:    'whatis-dots',
-            openBtnId: 'tuto-whatis-btn',
-        });
-
-        // ── Désactive les boutons tuto pendant le chargement de la session ────
-        const statusMsg = document.getElementById('status-msg');
-        const tutoBtns  = [
-            document.getElementById('tuto-howto-btn'),
-            document.getElementById('tuto-whatis-btn'),
-        ];
-        function syncTutoBtns() {
-            const loading = statusMsg && statusMsg.innerText.trim() !== '';
-            tutoBtns.forEach(btn => {
-                if (!btn) return;
-                btn.disabled = loading;
-                btn.style.opacity      = loading ? '0.25' : '';
-                btn.style.pointerEvents = loading ? 'none' : '';
-            });
-        }
-        if (statusMsg) {
-            new MutationObserver(syncTutoBtns).observe(statusMsg, { childList: true, characterData: true, subtree: true });
-        }
-
-    })();
-    </script>
-
-    <script>
-        // Attribution toggle — bouton ℹ custom
-        const attribBtn   = document.getElementById('attrib-btn');
-        const attribPanel = document.getElementById('attrib-panel');
-        let attribOpen = false;
-
-        attribBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            attribOpen = !attribOpen;
-            attribPanel.classList.toggle('attrib-panel--visible', attribOpen);
-            attribBtn.classList.toggle('filter-btn--active', attribOpen);
-        });
-
-        // Ferme en cliquant ailleurs
-        document.addEventListener('click', () => {
-            if (!attribOpen) return;
-            attribOpen = false;
-            attribPanel.classList.remove('attrib-panel--visible');
-            attribBtn.classList.remove('filter-btn--active');
-        });
-    </script>
+    <script src="src/tuto.js" defer></script>
+    
 </body>
 </html>

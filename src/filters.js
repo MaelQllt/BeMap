@@ -434,3 +434,23 @@ function toggleArrayFilter(key, value) {
     if (idx === -1) arr.push(value);
     else arr.splice(idx, 1);
 }
+
+
+// --- ATTRIBUTION TOGGLE ---
+const attribBtn   = document.getElementById('attrib-btn');
+const attribPanel = document.getElementById('attrib-panel');
+let attribOpen = false;
+
+attribBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    attribOpen = !attribOpen;
+    attribPanel.classList.toggle('attrib-panel--visible', attribOpen);
+    attribBtn.classList.toggle('filter-btn--active', attribOpen);
+});
+
+document.addEventListener('click', () => {
+    if (!attribOpen) return;
+    attribOpen = false;
+    attribPanel.classList.remove('attrib-panel--visible');
+    attribBtn.classList.remove('filter-btn--active');
+});
