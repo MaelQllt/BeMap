@@ -1,0 +1,18 @@
+[
+  {
+    "icon": "🗺️",
+    "text": "Tous vos BeReals placés sur une <strong>carte interactive</strong>, filtrables et explorables."
+  },
+  {
+    "icon": "📊",
+    "text": "Vos <strong>stats</strong> : pays visités, streak record, pourcentage à l'heure et bien plus."
+  },
+  {
+    "icon": "⏱️",
+    "text": "Revivez vos souvenirs en mode <strong>Timeline</strong> — jour par jour ou mois par mois."
+  },
+  {
+    "icon": "📍",
+    "text": "<strong>Repositionnez</strong> les BeReals sans localisation directement sur la carte."
+  }
+]

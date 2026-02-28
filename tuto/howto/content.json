@@ -1,0 +1,18 @@
+[
+  {
+    "icon": "📤",
+    "text": "Dans l'app BeReal, allez dans <strong>Profil → ··· → Exporter mes données</strong>. Vous recevrez un e-mail avec un lien."
+  },
+  {
+    "icon": "📧",
+    "text": "Ouvrez l'e-mail de BeReal et téléchargez le fichier <strong>.zip</strong> sur votre appareil."
+  },
+  {
+    "icon": "🗜️",
+    "text": "Dézippez l'archive. Vous obtenez un dossier avec vos photos et un fichier <strong>memories.json</strong>."
+  },
+  {
+    "icon": "📁",
+    "text": "Cliquez sur <strong>Choisir le dossier</strong> et sélectionnez ce dossier dézippé. C'est tout !"
+  }
+]
