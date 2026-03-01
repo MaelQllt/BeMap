@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BeMerge.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 24px;
+            gap: 24px;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -2px;
+        }
+        h1 span { font-weight: 100; }
+
+        .subtitle {
+            font-size: 13px;
+            font-weight: 300;
+            color: rgba(255,255,255,0.4);
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.7;
+        }
+
+        .cards {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 4px;
+        }
+
+        .card {
+            background: #111;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 20px;
+            padding: 24px 20px;
+            width: 160px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: border-color 0.2s ease;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .card:hover  { border-color: rgba(255,255,255,0.18); }
+        .card:active { background: #181818; }
+        .card.loaded { border-color: rgba(255,255,255,0.45); }
+
+        .card-icon { font-size: 24px; opacity: 0.85; }
+
+        .card-label {
+            font-size: 11px;
+            font-weight: 300;
+            color: rgba(255,255,255,0.35);
+            text-align: center;
+            line-height: 1.65;
+        }
+
+        .card-status {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.85);
+            min-height: 14px;
+            letter-spacing: 0.1px;
+        }
+
+        input[type="file"] { display: none; }
+
+        .merge-btn {
+            display: inline-block;
+            background: white;
+            color: black;
+            padding: 15px 36px;
+            border-radius: 30px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            margin-top: 4px;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            opacity: 0.2;
+            pointer-events: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .merge-btn.ready { opacity: 1; pointer-events: auto; }
+        .merge-btn.ready:hover  { transform: scale(1.05); }
+        .merge-btn.ready:active { transform: scale(0.97); }
+
+        .result {
+            font-size: 12px;
+            font-weight: 300;
+            color: rgba(255,255,255,0.35);
+            text-align: center;
+            line-height: 2;
+            display: none;
+            margin-top: 4px;
+        }
+        .result.visible { display: block; }
+        .result strong {
+            color: rgba(255,255,255,0.9);
+            font-weight: 600;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 5px;
+            padding: 1px 7px;
+            font-size: 10px;
+            font-weight: 400;
+            color: rgba(255,255,255,0.5);
+            margin-left: 5px;
+            vertical-align: middle;
+            line-height: 1;
+        }
+
+        .back-link {
+            font-size: 12px;
+            font-weight: 300;
+            color: rgba(255,255,255,0.2);
+            text-decoration: underline;
+            text-decoration-color: rgba(255,255,255,0.1);
+            text-underline-offset: 3px;
+            cursor: pointer;
+            transition: color 0.2s ease;
+            margin-top: 8px;
+        }
+        .back-link:hover { color: rgba(255,255,255,0.45); }
+        @media (pointer: coarse) {
+            .back-link:hover  { color: rgba(255,255,255,0.2); }
+            .back-link:active { color: rgba(255,255,255,0.5); }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>BeMerge. <span>json</span></h1>
+    <p class="subtitle">Fusionne deux <code>memories.json</code> en conservant vos relocalisations, sans doublons.</p>
+
+    <div class="cards">
+        <label class="card" id="card-old" for="input-old">
+            <span class="card-icon">📍</span>
+            <span class="card-label">Fichier actuel<br>avec relocalisations</span>
+            <span class="card-status" id="status-old"></span>
+            <input type="file" id="input-old" accept=".json">
+        </label>
+
+        <label class="card" id="card-new" for="input-new">
+            <span class="card-icon">📁</span>
+            <span class="card-label">Nouvelle archive<br>memories.json</span>
+            <span class="card-status" id="status-new"></span>
+            <input type="file" id="input-new" accept=".json">
+        </label>
+    </div>
+
+    <button class="merge-btn" id="merge-btn">Fusionner et télécharger</button>
+
+    <div class="result" id="result"></div>
+
+    <a class="back-link" href="index.html">← retour</a>
+
+    <script>
+        let dataOld = null;
+        let dataNew = null;
+
+        function readJSON(inputId, cardId, statusId, onLoad) {
+            document.getElementById(inputId).addEventListener('change', function() {
+                const file = this.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const parsed = JSON.parse(e.target.result);
+                        onLoad(parsed);
+                        document.getElementById(cardId).classList.add('loaded');
+                        document.getElementById(statusId).textContent = parsed.length + ' BeReals';
+                        checkReady();
+                    } catch {
+                        alert('Fichier JSON invalide.');
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        readJSON('input-old', 'card-old', 'status-old', (d) => { dataOld = d; });
+        readJSON('input-new', 'card-new', 'status-new', (d) => { dataNew = d; });
+
+        function checkReady() {
+            if (dataOld && dataNew) document.getElementById('merge-btn').classList.add('ready');
+        }
+
+        document.getElementById('merge-btn').addEventListener('click', merge);
+
+        function hasLocation(loc) {
+            if (!loc) return false;
+            const lng = parseFloat(loc.longitude);
+            const lat = parseFloat(loc.latitude);
+            return !isNaN(lng) && !isNaN(lat) && !(lng === 0 && lat === 0);
+        }
+
+        function merge() {
+            const oldMap = new Map();
+            dataOld.forEach(m => {
+                const key = m.uid ?? m.takenTime;
+                if (key) oldMap.set(key, m);
+            });
+
+            let countNew = 0, countMerged = 0, countNoLocation = 0;
+
+            const result = dataNew.map(m => {
+                const key = m.uid ?? m.takenTime;
+                const old = key ? oldMap.get(key) : null;
+
+                if (old) {
+                    if (old._relocated) {
+                        countMerged++;
+                        return Object.assign({}, m, { location: old.location, _relocated: true });
+                    }
+                    if (!hasLocation(m.location) && hasLocation(old.location)) {
+                        countMerged++;
+                        return Object.assign({}, m, { location: old.location });
+                    }
+                }
+
+                if (!old) countNew++;
+                if (!hasLocation(m.location)) countNoLocation++;
+                return m;
+            });
+
+            // Conserve les BeReals de l'ancien absents du nouveau
+            dataOld.forEach(old => {
+                const key = old.uid ?? old.takenTime;
+                const exists = dataNew.some(m => (m.uid ?? m.takenTime) === key);
+                if (!exists) result.push(old);
+            });
+
+            const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href = url;
+            a.download = 'memories.json';
+            a.click();
+            URL.revokeObjectURL(url);
+
+            const el = document.getElementById('result');
+            el.innerHTML =
+                '<strong>' + result.length + '</strong> BeReals au total<br>' +
+                '<strong>' + countNew + '</strong> nouveaux <span class="pill">nouveau</span><br>' +
+                '<strong>' + countMerged + '</strong> relocalisations conservées <span class="pill">mergé</span><br>' +
+                '<strong>' + countNoLocation + '</strong> sans localisation <span class="pill">sans GPS</span>';
+            el.classList.add('visible');
+        }
+    </script>
+
+</body>
+</html>

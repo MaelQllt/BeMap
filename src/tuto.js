@@ -292,6 +292,7 @@ const statusMsg = document.getElementById('status-msg');
 const tutoBtns  = [
     document.getElementById('tuto-howto-btn'),
     document.getElementById('tuto-whatis-btn'),
+    document.querySelector('a.tuto-open-btn[href="merge.html"]'),
 ];
 function syncTutoBtns() {
     const loading = statusMsg && statusMsg.innerText.trim() !== '';
