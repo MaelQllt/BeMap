@@ -502,7 +502,7 @@ function applyAndRefresh() {
 function resetFilters() {
     const f = getActiveFilters();
     f.years = []; f.months = []; f.onTime = 'all';
-    buildFiltersUI();
+    buildFiltersUI(true);
     applyAndRefresh();
 }
 
