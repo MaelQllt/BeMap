@@ -1,18 +1,71 @@
 [
   {
-    "icon": "📤",
-    "text": "Dans l'app BeReal, allez dans <strong>Profil → ··· → Exporter mes données</strong>. Vous recevrez un e-mail avec un lien."
+    "icon": "👤",
+    "img": "slide-1.png",
+    "text": "Dans l'app BeReal, appuyez sur votre <strong>photo de profil</strong><br>en bas à droite."
   },
+  {
+    "icon": "⚙️",
+    "img": "slide-2.png",
+    "text": "Appuyez sur l'icône <strong>Paramètres</strong> en haut à droite de votre profil."
+  },
+  {
+    "icon": "❓",
+    "img": "slide-3.png",
+    "text": "Dans les paramètres, appuyez sur <strong>Aide</strong>."
+  },
+  {
+    "icon": "✉️",
+    "img": "slide-4.png",
+    "text": "Puis appuyez sur <strong>Nous contacter</strong>."
+  },
+  {
+    "icon": "💬",
+    "img": "slide-5.png",
+    "text": "Choisissez <strong>Poser une Question</strong>."
+  },
+  {
+    "icon": "🔧",
+    "img": "slide-6.png",
+    "text": "Sélectionnez la catégorie <strong>Dépannage</strong>."
+  },
+  {
+    "icon": "📸",
+    "img": "slide-7.png",
+    "text": "Puis appuyez sur <strong>Memories</strong>."
+  },
+  {
+    "icon": "🙋",
+    "img": "slide-8.png",
+    "text": "Appuyez sur <strong>Encore besoin d'aide ?</strong> en bas de l'écran."
+  },
+  {
+    "icon": "📤",
+    "img": "slide-9.png",
+    "text": "Demandez <strong>une copie de vos données</strong> et confirmez."
+  },
+  {
+    "icon": "📬",
+    "img": "slide-10.png",
+    "text": "1-2 jours plus tard, dans vos <strong>messages BeReal.</strong>, récupérez <strong>Profil et données d'activité</strong>."  },
   {
     "icon": "🗜️",
-    "text": "Dézippez l'archive. Vous obtenez un dossier avec vos photos et un fichier <strong>memories.json</strong>."
+    "img": "slide-11.png",
+    "text": "<strong>Dézippez</strong> l'archive reçue. Vous obtenez un dossier contenant vos photos et vos données."
   },
   {
-    "icon": "📁",
-    "text": "Cliquez sur <strong>Choisir le dossier</strong> et sélectionnez ce dossier dézippé. C'est tout !"
+    "icon": "📄",
+    "img": "slide-12.png",
+    "text": "Le fichier <strong>memories.json</strong> contient vos BeReals. C'est lui que vous exportez si vous repositionnez des souvenirs."
   },
   {
-    "icon": "👤",
-    "text": "<strong>BeReal.<strong> BeMap."
+    "icon": "📱",
+    "img": "slide-13.png",
+    "text": "Sur mobile, ajoutez <strong>BeMap.</strong> à votre <strong>écran d'accueil</strong> pour une expérience plein écran, comme une vraie app."
+  },
+  {
+    "icon": "🗺️",
+    "img": "slide-14.png",
+    "text": "<strong>BeReal.</strong> BeMap."
   }
 ]

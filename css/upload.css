@@ -237,6 +237,13 @@
 .tuto-img-icon { font-size: 52px; opacity: 0.18; }
 
 /* ── TEXTE — sous la modal ── */
+.tuto-text-wrapper {
+    min-height: calc(1.65em * 2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .tuto-text {
     position: relative;
     z-index: 2;
@@ -247,7 +254,7 @@
     text-align: center;
     line-height: 1.65;
     margin: 0;
-    max-width: 260px;
+    max-width: 340px;
 }
 .tuto-text strong {
     font-weight: 600;
