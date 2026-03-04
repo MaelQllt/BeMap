@@ -150,6 +150,7 @@ function endMiniDrag() {
         const p = currentPhotos[currentIndex];
         mainPhoto.src = newFlipped ? p.front : p.back;
         document.getElementById('mini-photo').src = newFlipped ? p.back : p.front;
+        navigator.vibrate?.(8);
     } else {
         setJustFinishedDrag(true);
         miniBox.style.transition = 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
@@ -321,11 +322,14 @@ photoContainer.addEventListener('touchstart', (e) => {
         if (isDragging) return;
         _touchStartX = e.touches[0].clientX;
         _touchStartY = e.touches[0].clientY;
+        // Long-press : cache la miniature (ne zoom plus avec 1 doigt sur mobile)
         _longPressTimer = setTimeout(() => {
             _longPressTimer = null;
             if (isDragging) return;
-            startZoom(e.touches[0].clientX, e.touches[0].clientY);
-        }, 150);
+            miniBox.style.transition = 'opacity 0.2s ease';
+            miniBox.style.opacity = '0';
+            miniBox.style.pointerEvents = 'none';
+        }, 300);
     }
 }, { passive: false });
 
@@ -344,18 +348,20 @@ photoContainer.addEventListener('touchmove', (e) => {
         mainPhoto.style.transition = 'none';
         updateTransform();
         e.preventDefault();
-    } else if (isZooming && !_isPinching && e.touches.length === 1) {
+    } else if (e.touches.length === 1) {
         if (_longPressTimer) {
             const dx = e.touches[0].clientX - _touchStartX;
             const dy = e.touches[0].clientY - _touchStartY;
             if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                 clearTimeout(_longPressTimer);
                 _longPressTimer = null;
-                return;
             }
         }
-        handlePan(e.touches[0].clientX, e.touches[0].clientY);
-        e.preventDefault();
+        // Pan 1 doigt uniquement si déjà zoomé via pinch
+        if (isZooming && !_isPinching) {
+            handlePan(e.touches[0].clientX, e.touches[0].clientY);
+            e.preventDefault();
+        }
     }
 }, { passive: false });
 
@@ -366,6 +372,11 @@ photoContainer.addEventListener('touchend', (e) => {
         clearTimeout(_longPressTimer);
         _longPressTimer = null;
     }
+
+    // Remettre la miniature visible quand on lève le doigt
+    miniBox.style.transition = 'opacity 0.2s ease';
+    miniBox.style.opacity = '1';
+    miniBox.style.pointerEvents = 'auto';
 
     if (_isPinching) {
         _isPinching = false;
