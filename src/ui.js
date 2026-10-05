@@ -44,7 +44,7 @@ export function showStatsLoader(visible, bannerWasVisible = false) {
 }
 
 // --- BANDEAU RELOCATION ---
-export function showRelocationBanner(onCancel) {
+export function showRelocationBanner(onCancel, count = 1) {
     if (document.getElementById('relocation-banner')) return;
 
     const banner = document.createElement('div');
@@ -53,7 +53,7 @@ export function showRelocationBanner(onCancel) {
     banner.innerHTML = `
         <span class="relocation-banner__text">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:0.7"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-            Tape sur la carte pour repositionner
+            ${count > 1 ? `Tape sur la carte pour déplacer ${count} BeReals` : 'Tape sur la carte pour repositionner'}
         </span>
         <button class="relocation-banner__cancel" id="relocation-cancel-btn">Annuler</button>
     `;

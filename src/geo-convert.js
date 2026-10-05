@@ -7,7 +7,7 @@ import { getLocalUrl } from './utils.js';
 
 export function convertMemoriesToGeoJSON(data) {
     const seenIds = new Set();
-    return data.map(m => {
+    return data.map((m, memoryIndex) => {
         const momentId = m.berealMoment || m.takenTime || m.date;
         const isBonus = seenIds.has(momentId);
         seenIds.add(momentId);
@@ -22,6 +22,7 @@ export function convertMemoriesToGeoJSON(data) {
             type: 'Feature',
             geometry: { type: 'Point', coordinates: [isNaN(lng) ? 0 : lng, isNaN(lat) ? 0 : lat] },
             properties: {
+                memoryIndex,
                 front:    getLocalUrl(m.frontImage?.path),
                 back:     getLocalUrl(m.backImage?.path),
                 caption:  m.caption || "",

@@ -29,6 +29,7 @@ export let lastMouseY = 0;
 export let clusterMarkers = {};      // Markers HTML actifs sur la carte
 export let isRelocating = false;     // Mode repositionnement actif
 export let memoryToUpdate = null;    // Memory en cours de repositionnement
+export let selectedMemories = [];    // Souvenirs sélectionnés pour une relocalisation groupée
 
 // --- DONNÉES ---
 export let allMemoriesData = [];     // Source de vérité des memories
@@ -60,6 +61,7 @@ export function setLastMouseY(val) { lastMouseY = val; }
 export function setClusterMarkers(val) { clusterMarkers = val; }
 export function setIsRelocating(val) { isRelocating = val; }
 export function setMemoryToUpdate(val) { memoryToUpdate = val; }
+export function setSelectedMemories(val) { selectedMemories = val; }
 export function setAllMemoriesData(val) { allMemoriesData = val; }
 export function setFileMap(val) { fileMap = val; }
 export function setCachedStats(val) { cachedStats = val; }

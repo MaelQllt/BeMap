@@ -3,7 +3,7 @@
  */
 
 import { saveFileToSession, loadSessionFiles, checkDifferencesAndShowExport } from './db.js';
-import { fileMap, setFileMap, allMemoriesData, setAllMemoriesData, isRelocating, memoryToUpdate, setIsRelocating } from './state.js';
+import { fileMap, setFileMap, allMemoriesData, setAllMemoriesData, isRelocating, memoryToUpdate, setIsRelocating, setMemoryToUpdate, setSelectedMemories } from './state.js';
 import { map, setup3DBuildings, setupMapLayers, refreshMapMarkers, watchZoomRadius, showRelocationHighlight, clearRelocationHighlight } from './map.js';
 import { calculateStats, setCachedStats, initDashboard, closeDashboard, switchDash, navigateDash } from './dashboard.js';
 import { initBadge } from './badge.js';
@@ -15,7 +15,6 @@ import { initFilters, buildFiltersUI, closeFilters } from './filters.js';
 import { showMapToast, showStatsLoader, showRelocationBanner, hideRelocationBanner } from './ui.js';
 
 setMapRef(map);
-let _saveDebounceTimer = null;
 
 // --- DÉMARRAGE ANTICIPÉ ---
 if (localStorage.getItem('bereal_session_active') === 'true') {
@@ -57,15 +56,20 @@ async function initApp(userData, memoriesData, friendsData) {
 
 // --- REPOSITIONNEMENT ---
 document.addEventListener('app:relocation-start', (e) => {
-    const { uid, rawDate, location } = e.detail;
-    setTimeout(() => showRelocationHighlight(uid, rawDate, location), 150);
+    const { targets = [], location } = e.detail;
+    if (targets.length === 1) {
+        const target = targets[0];
+        setTimeout(() => showRelocationHighlight(target.uid, target.rawDate, location), 150);
+    }
     showRelocationBanner(() => {
         setIsRelocating(false);
+        setMemoryToUpdate(null);
+        setSelectedMemories([]);
         clearRelocationHighlight();
         document.getElementById('map').style.cursor = '';
         hideRelocationBanner();
         showMapToast('Repositionnement annulé.');
-    });
+    }, targets.length);
 });
 
 map.on('click', async (e) => {
@@ -73,30 +77,54 @@ map.on('click', async (e) => {
 
     const { lng, lat } = e.lngLat;
 
-    const index = allMemoriesData.findIndex(m =>
-        (m.uid != null && m.uid === memoryToUpdate.uid) ||
-        m.takenTime === memoryToUpdate.rawDate
-    );
-    if (index === -1) {
-        showMapToast("Souvenir introuvable.", 'error');
+    const targets = Array.isArray(memoryToUpdate) ? memoryToUpdate : [memoryToUpdate];
+    const indexes = [...new Set(targets.map(target => {
+        const memoryIndex = target.memoryIndex == null ? NaN : Number(target.memoryIndex);
+        if (Number.isInteger(memoryIndex) && memoryIndex >= 0 && allMemoriesData[memoryIndex]) {
+            return memoryIndex;
+        }
+        const identity = target.uid ?? target.rawDate;
+        return allMemoriesData.findIndex(memory => (memory.uid ?? memory.takenTime) === identity);
+    }).filter(index => index !== -1))];
+
+    if (!indexes.length || indexes.length !== targets.length) {
+        showMapToast("Un ou plusieurs souvenirs sont introuvables.", 'error');
         return;
     }
 
-    allMemoriesData[index].location   = { latitude: lat, longitude: lng };
-    allMemoriesData[index]._relocated = true;
+    const previousValues = indexes.map(index => ({
+        memory: allMemoriesData[index],
+        location: allMemoriesData[index].location,
+        hadRelocated: Object.prototype.hasOwnProperty.call(allMemoriesData[index], '_relocated'),
+        relocated: allMemoriesData[index]._relocated,
+    }));
+    indexes.forEach(index => {
+        allMemoriesData[index].location = { latitude: lat, longitude: lng };
+        allMemoriesData[index]._relocated = true;
+    });
 
-    clearTimeout(_saveDebounceTimer);
-    _saveDebounceTimer = setTimeout(async () => {
+    try {
         const blob = new Blob([JSON.stringify(allMemoriesData)], { type: 'application/json' });
-        await saveFileToSession("memories.json", blob);
-    }, 1000);
+        await saveFileToSession('memories.json', blob);
+    } catch (err) {
+        previousValues.forEach(({ memory, location, hadRelocated, relocated }) => {
+            memory.location = location;
+            if (hadRelocated) memory._relocated = relocated;
+            else delete memory._relocated;
+        });
+        showMapToast('Impossible d’enregistrer les positions.', 'error');
+        console.error('Erreur de sauvegarde des relocalisations:', err);
+        return;
+    }
 
     refreshMapMarkers(allMemoriesData, convertMemoriesToGeoJSON);
-    checkDifferencesAndShowExport();
+    await checkDifferencesAndShowExport();
 
     const bannerWasVisible = !!document.getElementById('relocation-banner');
     hideRelocationBanner();
     setIsRelocating(false);
+    setMemoryToUpdate(null);
+    setSelectedMemories([]);
     clearRelocationHighlight();
     document.getElementById('map').style.cursor = '';
 
@@ -113,7 +141,8 @@ map.on('click', async (e) => {
         showStatsLoader(false);
     }
 
-    showMapToast("Position mise à jour.");
+    const count = indexes.length;
+    showMapToast(count === 1 ? 'Position mise à jour.' : `${count} BeReals déplacés.`);
 });
 
 // --- UPLOAD INITIAL ---
@@ -209,6 +238,8 @@ document.addEventListener('keydown', (e) => {
 
     if (e.key === 'Escape' && isRelocating) {
         setIsRelocating(false);
+        setMemoryToUpdate(null);
+        setSelectedMemories([]);
         clearRelocationHighlight();
         hideRelocationBanner();
         document.getElementById('map').style.cursor = '';

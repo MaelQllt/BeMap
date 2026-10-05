@@ -17,7 +17,8 @@ import {
     lastMouseX, setLastMouseX,
     lastMouseY, setLastMouseY,
     setIsRelocating,
-    setMemoryToUpdate
+    setMemoryToUpdate,
+    selectedMemories, setSelectedMemories
 } from './state.js';
 import { setMapFocus } from './map.js';
 import { syncPWAHeight } from './utils.js';
@@ -34,6 +35,7 @@ export function openModal(photos) {
     setCurrentPhotos(photos);
     setCurrentIndex(0);
     setCurrentMiniSide('left');
+    setSelectedMemories([]);
     updateModalContent();
     modal.style.display = 'flex';
     setMapFocus(true);
@@ -44,6 +46,7 @@ export function openModal(photos) {
 export function closeModal() {
     if (isDragging || justFinishedDrag || isZooming) return;
     modal.style.display = 'none';
+    setSelectedMemories([]);
     setCurrentMiniSide('left');
     if (counter) {
         counter.style.left = 'auto';
@@ -60,8 +63,10 @@ export function closeModal() {
 export function updateModalContent() {
     const p = currentPhotos[currentIndex];
     const replaceBtn = document.getElementById('replace-button');
+    const selectBtn = document.getElementById('select-memory-button');
 
     replaceBtn?.style.setProperty('display', 'none', 'important');
+    selectBtn?.style.setProperty('display', 'none', 'important');
     if (!p) return;
 
     // Normalisation de la localisation (peut être une string JSON sérialisée par MapLibre)
@@ -80,7 +85,25 @@ export function updateModalContent() {
 
     photoContainer.classList.toggle('on-time', p.isLate === false && p.isBonus === false);
 
-    if (replaceBtn) replaceBtn.style.display = p.canBeRelocated ? 'block' : 'none';
+    const identity = getPhotoIdentity(p);
+    const isSelected = selectedMemories.some(memory => getPhotoIdentity(memory) === identity);
+    const hasSelection = selectedMemories.length > 0;
+    if (replaceBtn) {
+        replaceBtn.style.display = p.canBeRelocated || hasSelection ? 'block' : 'none';
+        replaceBtn.textContent = hasSelection
+            ? `REPLACER (${selectedMemories.length})`
+            : 'REPLACER';
+    }
+
+    if (selectBtn) {
+        const canSelectFromCluster = currentPhotos.length > 1 && p.canBeRelocated;
+        selectBtn.style.display = canSelectFromCluster ? 'flex' : 'none';
+        selectBtn.setAttribute('aria-pressed', String(isSelected));
+        selectBtn.title = isSelected
+            ? 'Retirer ce BeReal du déplacement groupé'
+            : 'Inclure ce BeReal dans le déplacement groupé';
+        selectBtn.classList.toggle('selected', isSelected);
+    }
 
     miniBox.style.transition = 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     const xPos = currentMiniSide === 'right' ? photoContainer.offsetWidth - miniBox.offsetWidth - 28 : 0;
@@ -100,6 +123,22 @@ export function updateModalContent() {
     if (counter) counter.innerText = hasMultiple ? `${currentIndex + 1}/${currentPhotos.length}` : '';
 
     _updateSwipeHint(hasMultiple && isMobile);
+}
+
+function getPhotoIdentity(photo) {
+    if (Number.isInteger(photo?.memoryIndex)) return `index:${photo.memoryIndex}`;
+    return photo?.uid ?? photo?.rawDate ?? null;
+}
+
+function startRelocation(targets, location = null) {
+    setMemoryToUpdate(targets);
+    setIsRelocating(true);
+    resetZoomState();
+    closeModal();
+    document.getElementById('map').style.cursor = 'crosshair';
+    document.dispatchEvent(new CustomEvent('app:relocation-start', {
+        detail: { targets, location }
+    }));
 }
 
 export function nextPhoto() {
@@ -459,15 +498,25 @@ modal.addEventListener('touchend', (e) => {
 // --- BOUTON REPLACER ---
 document.getElementById('replace-button')?.addEventListener('click', () => {
     const photo = currentPhotos[currentIndex];
-    setMemoryToUpdate(photo);
-    setIsRelocating(true);
-    closeModal();
-    document.getElementById('map').style.cursor = 'crosshair';
     let loc = photo.location;
     if (typeof loc === 'string') { try { loc = JSON.parse(loc); } catch { loc = null; } }
-    document.dispatchEvent(new CustomEvent('app:relocation-start', {
-        detail: { uid: photo.uid, rawDate: photo.rawDate, location: loc }
-    }));
+    const targets = selectedMemories.length
+        ? [...selectedMemories]
+        : [{ memoryIndex: photo.memoryIndex, uid: photo.uid, rawDate: photo.rawDate }];
+    startRelocation(targets, loc);
+});
+
+document.getElementById('select-memory-button')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const photo = currentPhotos[currentIndex];
+    if (!photo?.canBeRelocated) return;
+
+    const identity = getPhotoIdentity(photo);
+    const alreadySelected = selectedMemories.some(memory => getPhotoIdentity(memory) === identity);
+    setSelectedMemories(alreadySelected
+        ? selectedMemories.filter(memory => getPhotoIdentity(memory) !== identity)
+        : [...selectedMemories, { memoryIndex: photo.memoryIndex, uid: photo.uid, rawDate: photo.rawDate }]);
+    updateModalContent();
 });
 
 // --- NAVIGATION ---
@@ -483,6 +532,7 @@ const PROTECTED_SELECTORS = [
     '#prevBtn',
     '#nextBtn',
     '#replace-button',
+    '#select-memory-button',
 ];
 
 document.querySelector('.modal-content')?.addEventListener('click', (e) => {
